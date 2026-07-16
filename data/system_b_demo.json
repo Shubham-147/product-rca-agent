@@ -1,0 +1,222 @@
+[
+  {
+    "question": "Why did checkout abandonment spike?",
+    "hypothesis": {
+      "mechanism": "Checkout latency caused affected sessions to stall or abandon.",
+      "affected_cohort": [
+        "user_0003",
+        "user_0013",
+        "user_0020",
+        "user_0027",
+        "user_0070",
+        "user_0077",
+        "user_0091",
+        "user_0095",
+        "user_0103",
+        "user_0104",
+        "user_0123",
+        "user_0128",
+        "user_0129",
+        "user_0130",
+        "user_0139",
+        "user_0141",
+        "user_0149",
+        "user_0174",
+        "user_0177",
+        "user_0184",
+        "user_0195",
+        "user_0230",
+        "user_0249",
+        "user_0257",
+        "user_0289",
+        "user_0294",
+        "user_0312",
+        "user_0323",
+        "user_0324",
+        "user_0357",
+        "user_0359",
+        "user_0361",
+        "user_0382",
+        "user_0386",
+        "user_0400",
+        "user_0415",
+        "user_0428",
+        "user_0439",
+        "user_0442",
+        "user_0455",
+        "user_0473",
+        "user_0483",
+        "user_0523",
+        "user_0541",
+        "user_0550",
+        "user_0554",
+        "user_0568",
+        "user_0575",
+        "user_0592",
+        "user_0615",
+        "user_0618",
+        "user_0628",
+        "user_0658",
+        "user_0669",
+        "user_0683",
+        "user_0689",
+        "user_0696",
+        "user_0699",
+        "user_0712",
+        "user_0748"
+      ],
+      "evidence": [
+        "Compared explicit checkout latency outcomes in the event stream.",
+        "DuckDB returned 60 distinct affected users."
+      ],
+      "confounders_ruled_out": [],
+      "confidence": 0.82
+    },
+    "grounded_in_query_results": true,
+    "tool_calls": [
+      {
+        "tool": "retrieve",
+        "query": "Why did checkout abandonment spike?",
+        "rows": 5
+      },
+      {
+        "tool": "resolve_events",
+        "query": "Why did checkout abandonment spike?",
+        "rows": 5
+      },
+      {
+        "tool": "run_sql",
+        "query": "SELECT DISTINCT user_id FROM events WHERE outcome IN ('slow', 'threshold_exceeded') ORDER BY user_id",
+        "rows": 60
+      }
+    ]
+  },
+  {
+    "question": "Why are older Android users crashing before adding to cart?",
+    "hypothesis": {
+      "mechanism": "A device/OS-specific crash interrupted the funnel before cart activity.",
+      "affected_cohort": [
+        "user_0007",
+        "user_0134",
+        "user_0164",
+        "user_0182",
+        "user_0199",
+        "user_0215",
+        "user_0232",
+        "user_0252",
+        "user_0267",
+        "user_0287",
+        "user_0288",
+        "user_0358",
+        "user_0371",
+        "user_0391",
+        "user_0395",
+        "user_0405",
+        "user_0414",
+        "user_0437",
+        "user_0489",
+        "user_0498",
+        "user_0581",
+        "user_0605",
+        "user_0614",
+        "user_0635",
+        "user_0709"
+      ],
+      "evidence": [
+        "Restricted crash results to the Android 10 cohort.",
+        "DuckDB returned 25 distinct affected users."
+      ],
+      "confounders_ruled_out": [],
+      "confidence": 0.82
+    },
+    "grounded_in_query_results": true,
+    "tool_calls": [
+      {
+        "tool": "retrieve",
+        "query": "Why are older Android users crashing before adding to cart?",
+        "rows": 5
+      },
+      {
+        "tool": "resolve_events",
+        "query": "Why are older Android users crashing before adding to cart?",
+        "rows": 5
+      },
+      {
+        "tool": "run_sql",
+        "query": "SELECT DISTINCT user_id FROM events WHERE outcome = 'crash' AND os = 'Android_10' ORDER BY user_id",
+        "rows": 25
+      }
+    ]
+  },
+  {
+    "question": "Why did payment completion fall for one provider?",
+    "hypothesis": {
+      "mechanism": "A payment-provider error prevented successful completion.",
+      "affected_cohort": [
+        "user_0033",
+        "user_0046",
+        "user_0067",
+        "user_0080",
+        "user_0086",
+        "user_0093",
+        "user_0097",
+        "user_0118",
+        "user_0142",
+        "user_0145",
+        "user_0204",
+        "user_0216",
+        "user_0217",
+        "user_0253",
+        "user_0266",
+        "user_0270",
+        "user_0278",
+        "user_0279",
+        "user_0292",
+        "user_0294",
+        "user_0315",
+        "user_0335",
+        "user_0402",
+        "user_0431",
+        "user_0447",
+        "user_0561",
+        "user_0563",
+        "user_0582",
+        "user_0583",
+        "user_0623",
+        "user_0625",
+        "user_0648",
+        "user_0653",
+        "user_0667",
+        "user_0694",
+        "user_0716",
+        "user_0732",
+        "user_0735",
+        "user_0745"
+      ],
+      "evidence": [
+        "Selected explicit provider_error outcomes from payment events.",
+        "DuckDB returned 39 distinct affected users."
+      ],
+      "confounders_ruled_out": [],
+      "confidence": 0.82
+    },
+    "grounded_in_query_results": true,
+    "tool_calls": [
+      {
+        "tool": "retrieve",
+        "query": "Why did payment completion fall for one provider?",
+        "rows": 5
+      },
+      {
+        "tool": "resolve_events",
+        "query": "Why did payment completion fall for one provider?",
+        "rows": 5
+      },
+      {
+        "tool": "run_sql",
+        "query": "SELECT DISTINCT user_id FROM events WHERE outcome = 'provider_error' ORDER BY user_id",
+        "rows": 39
+      }
+    ]
+  }
+]

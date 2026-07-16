@@ -1,0 +1,457 @@
+[
+  {
+    "event_name": "app_open",
+    "description": "Application process opened",
+    "category": "lifecycle",
+    "is_alias_of": null,
+    "is_dead": false
+  },
+  {
+    "event_name": "splash_view",
+    "description": "Splash screen displayed",
+    "category": "screen",
+    "is_alias_of": null,
+    "is_dead": false
+  },
+  {
+    "event_name": "home_render",
+    "description": "Home screen rendered",
+    "category": "screen",
+    "is_alias_of": null,
+    "is_dead": false
+  },
+  {
+    "event_name": "search_view",
+    "description": "Search screen displayed",
+    "category": "screen",
+    "is_alias_of": null,
+    "is_dead": false
+  },
+  {
+    "event_name": "search_submit",
+    "description": "A search query was submitted",
+    "category": "interaction",
+    "is_alias_of": null,
+    "is_dead": false
+  },
+  {
+    "event_name": "product_view",
+    "description": "Product detail screen displayed",
+    "category": "screen",
+    "is_alias_of": null,
+    "is_dead": false
+  },
+  {
+    "event_name": "add_to_cart",
+    "description": "Product added to cart",
+    "category": "commerce",
+    "is_alias_of": null,
+    "is_dead": false
+  },
+  {
+    "event_name": "cart_view",
+    "description": "Cart screen displayed",
+    "category": "screen",
+    "is_alias_of": null,
+    "is_dead": false
+  },
+  {
+    "event_name": "checkout_start",
+    "description": "Checkout flow started",
+    "category": "commerce",
+    "is_alias_of": null,
+    "is_dead": false
+  },
+  {
+    "event_name": "shipping_view",
+    "description": "Shipping screen displayed",
+    "category": "screen",
+    "is_alias_of": null,
+    "is_dead": false
+  },
+  {
+    "event_name": "shipping_submit",
+    "description": "Shipping details submitted",
+    "category": "commerce",
+    "is_alias_of": null,
+    "is_dead": false
+  },
+  {
+    "event_name": "payment_view",
+    "description": "Payment screen displayed",
+    "category": "screen",
+    "is_alias_of": null,
+    "is_dead": false
+  },
+  {
+    "event_name": "payment_submit",
+    "description": "Payment attempt submitted",
+    "category": "commerce",
+    "is_alias_of": null,
+    "is_dead": false
+  },
+  {
+    "event_name": "payment_failure",
+    "description": "Payment provider rejected or errored",
+    "category": "error",
+    "is_alias_of": null,
+    "is_dead": false
+  },
+  {
+    "event_name": "order_complete",
+    "description": "Order successfully created",
+    "category": "commerce",
+    "is_alias_of": null,
+    "is_dead": false
+  },
+  {
+    "event_name": "confirmation_view",
+    "description": "Order confirmation displayed",
+    "category": "screen",
+    "is_alias_of": null,
+    "is_dead": false
+  },
+  {
+    "event_name": "recommendations_view",
+    "description": "Post-purchase recommendations displayed",
+    "category": "screen",
+    "is_alias_of": null,
+    "is_dead": false
+  },
+  {
+    "event_name": "loyalty_view",
+    "description": "Loyalty screen displayed",
+    "category": "screen",
+    "is_alias_of": null,
+    "is_dead": false
+  },
+  {
+    "event_name": "session_end",
+    "description": "Synthetic end-of-session marker",
+    "category": "lifecycle",
+    "is_alias_of": null,
+    "is_dead": false
+  },
+  {
+    "event_name": "app_crash",
+    "description": "Application crashed",
+    "category": "error",
+    "is_alias_of": null,
+    "is_dead": false
+  },
+  {
+    "event_name": "api_error",
+    "description": "Backend request failed",
+    "category": "error",
+    "is_alias_of": null,
+    "is_dead": false
+  },
+  {
+    "event_name": "checkout_slow",
+    "description": "Checkout response exceeded latency threshold",
+    "category": "performance",
+    "is_alias_of": null,
+    "is_dead": false
+  },
+  {
+    "event_name": "cold_start",
+    "description": "Application launched without a warm process",
+    "category": "performance",
+    "is_alias_of": null,
+    "is_dead": false
+  },
+  {
+    "event_name": "promo_interstitial_view",
+    "description": "Optional promotion interstitial displayed",
+    "category": "screen",
+    "is_alias_of": null,
+    "is_dead": false
+  },
+  {
+    "event_name": "promo_skip",
+    "description": "Optional promotion was intentionally skipped",
+    "category": "interaction",
+    "is_alias_of": null,
+    "is_dead": false
+  },
+  {
+    "event_name": "filter_apply",
+    "description": "Search filter applied",
+    "category": "interaction",
+    "is_alias_of": null,
+    "is_dead": false
+  },
+  {
+    "event_name": "wishlist_add",
+    "description": "Product added to wishlist",
+    "category": "interaction",
+    "is_alias_of": null,
+    "is_dead": false
+  },
+  {
+    "event_name": "coupon_apply",
+    "description": "Coupon code applied",
+    "category": "commerce",
+    "is_alias_of": null,
+    "is_dead": false
+  },
+  {
+    "event_name": "address_edit",
+    "description": "Saved address edited",
+    "category": "interaction",
+    "is_alias_of": null,
+    "is_dead": false
+  },
+  {
+    "event_name": "support_open",
+    "description": "Support entry point opened",
+    "category": "interaction",
+    "is_alias_of": null,
+    "is_dead": false
+  },
+  {
+    "event_name": "network_retry",
+    "description": "A failed network request was retried",
+    "category": "performance",
+    "is_alias_of": null,
+    "is_dead": false
+  },
+  {
+    "event_name": "login_success",
+    "description": "User authentication succeeded",
+    "category": "identity",
+    "is_alias_of": null,
+    "is_dead": false
+  },
+  {
+    "event_name": "logout",
+    "description": "User signed out",
+    "category": "identity",
+    "is_alias_of": null,
+    "is_dead": false
+  },
+  {
+    "event_name": "experiment_exposure",
+    "description": "User exposed to an experiment",
+    "category": "experiment",
+    "is_alias_of": null,
+    "is_dead": false
+  },
+  {
+    "event_name": "appOpen",
+    "description": "Alias for app_open: Application process opened",
+    "category": "lifecycle",
+    "is_alias_of": "app_open",
+    "is_dead": false
+  },
+  {
+    "event_name": "launch_app",
+    "description": "Alias for app_open: Application process opened",
+    "category": "lifecycle",
+    "is_alias_of": "app_open",
+    "is_dead": false
+  },
+  {
+    "event_name": "homeRendered",
+    "description": "Alias for home_render: Home screen rendered",
+    "category": "screen",
+    "is_alias_of": "home_render",
+    "is_dead": false
+  },
+  {
+    "event_name": "hm_rndr",
+    "description": "Alias for home_render: Home screen rendered",
+    "category": "screen",
+    "is_alias_of": "home_render",
+    "is_dead": false
+  },
+  {
+    "event_name": "searchScreen",
+    "description": "Alias for search_view: Search screen displayed",
+    "category": "screen",
+    "is_alias_of": "search_view",
+    "is_dead": false
+  },
+  {
+    "event_name": "srch_view",
+    "description": "Alias for search_view: Search screen displayed",
+    "category": "screen",
+    "is_alias_of": "search_view",
+    "is_dead": false
+  },
+  {
+    "event_name": "productViewed",
+    "description": "Alias for product_view: Product detail screen displayed",
+    "category": "screen",
+    "is_alias_of": "product_view",
+    "is_dead": false
+  },
+  {
+    "event_name": "pdp_view",
+    "description": "Alias for product_view: Product detail screen displayed",
+    "category": "screen",
+    "is_alias_of": "product_view",
+    "is_dead": false
+  },
+  {
+    "event_name": "addToCart",
+    "description": "Alias for add_to_cart: Product added to cart",
+    "category": "commerce",
+    "is_alias_of": "add_to_cart",
+    "is_dead": false
+  },
+  {
+    "event_name": "atc",
+    "description": "Alias for add_to_cart: Product added to cart",
+    "category": "commerce",
+    "is_alias_of": "add_to_cart",
+    "is_dead": false
+  },
+  {
+    "event_name": "viewCart",
+    "description": "Alias for cart_view: Cart screen displayed",
+    "category": "screen",
+    "is_alias_of": "cart_view",
+    "is_dead": false
+  },
+  {
+    "event_name": "crt_view",
+    "description": "Alias for cart_view: Cart screen displayed",
+    "category": "screen",
+    "is_alias_of": "cart_view",
+    "is_dead": false
+  },
+  {
+    "event_name": "begin_checkout",
+    "description": "Alias for checkout_start: Checkout flow started",
+    "category": "commerce",
+    "is_alias_of": "checkout_start",
+    "is_dead": false
+  },
+  {
+    "event_name": "chkout_init",
+    "description": "Alias for checkout_start: Checkout flow started",
+    "category": "commerce",
+    "is_alias_of": "checkout_start",
+    "is_dead": false
+  },
+  {
+    "event_name": "shippingScreen",
+    "description": "Alias for shipping_view: Shipping screen displayed",
+    "category": "screen",
+    "is_alias_of": "shipping_view",
+    "is_dead": false
+  },
+  {
+    "event_name": "ship_pg",
+    "description": "Alias for shipping_view: Shipping screen displayed",
+    "category": "screen",
+    "is_alias_of": "shipping_view",
+    "is_dead": false
+  },
+  {
+    "event_name": "paymentScreen",
+    "description": "Alias for payment_view: Payment screen displayed",
+    "category": "screen",
+    "is_alias_of": "payment_view",
+    "is_dead": false
+  },
+  {
+    "event_name": "pay_view",
+    "description": "Alias for payment_view: Payment screen displayed",
+    "category": "screen",
+    "is_alias_of": "payment_view",
+    "is_dead": false
+  },
+  {
+    "event_name": "submitPayment",
+    "description": "Alias for payment_submit: Payment attempt submitted",
+    "category": "commerce",
+    "is_alias_of": "payment_submit",
+    "is_dead": false
+  },
+  {
+    "event_name": "pay_submit",
+    "description": "Alias for payment_submit: Payment attempt submitted",
+    "category": "commerce",
+    "is_alias_of": "payment_submit",
+    "is_dead": false
+  },
+  {
+    "event_name": "paymentFailed",
+    "description": "Alias for payment_failure: Payment provider rejected or errored",
+    "category": "error",
+    "is_alias_of": "payment_failure",
+    "is_dead": false
+  },
+  {
+    "event_name": "pay_fail",
+    "description": "Alias for payment_failure: Payment provider rejected or errored",
+    "category": "error",
+    "is_alias_of": "payment_failure",
+    "is_dead": false
+  },
+  {
+    "event_name": "purchase",
+    "description": "Alias for order_complete: Order successfully created",
+    "category": "commerce",
+    "is_alias_of": "order_complete",
+    "is_dead": false
+  },
+  {
+    "event_name": "orderCompleted",
+    "description": "Alias for order_complete: Order successfully created",
+    "category": "commerce",
+    "is_alias_of": "order_complete",
+    "is_dead": false
+  },
+  {
+    "event_name": "appCrash",
+    "description": "Alias for app_crash: Application crashed",
+    "category": "error",
+    "is_alias_of": "app_crash",
+    "is_dead": false
+  },
+  {
+    "event_name": "fatal_err",
+    "description": "Alias for app_crash: Application crashed",
+    "category": "error",
+    "is_alias_of": "app_crash",
+    "is_dead": false
+  },
+  {
+    "event_name": "sessionEnd",
+    "description": "Alias for session_end: Synthetic end-of-session marker",
+    "category": "lifecycle",
+    "is_alias_of": "session_end",
+    "is_dead": false
+  },
+  {
+    "event_name": "legacy_quick_buy",
+    "description": "Retired one-tap purchase event",
+    "category": "commerce",
+    "is_alias_of": null,
+    "is_dead": true
+  },
+  {
+    "event_name": "old_rewards_banner",
+    "description": "Removed rewards banner impression",
+    "category": "screen",
+    "is_alias_of": null,
+    "is_dead": true
+  },
+  {
+    "event_name": "beta_ar_tryon",
+    "description": "Abandoned AR try-on experiment",
+    "category": "experiment",
+    "is_alias_of": null,
+    "is_dead": true
+  },
+  {
+    "event_name": "fax_receipt_request",
+    "description": "Unused receipt delivery option",
+    "category": "interaction",
+    "is_alias_of": null,
+    "is_dead": true
+  }
+]

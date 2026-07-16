@@ -1,0 +1,107 @@
+{
+  "k": 3,
+  "cases": [
+    {
+      "query": "checkout start",
+      "relevant": [
+        "begin_checkout",
+        "checkout_start",
+        "chkout_init"
+      ],
+      "dense_results": [
+        "checkout_start",
+        "begin_checkout",
+        "chkout_init"
+      ],
+      "hybrid_results": [
+        "checkout_start",
+        "begin_checkout",
+        "chkout_init"
+      ],
+      "dense_precision_at_k": 1.0,
+      "hybrid_precision_at_k": 1.0
+    },
+    {
+      "query": "application crash",
+      "relevant": [
+        "appCrash",
+        "app_crash",
+        "fatal_err"
+      ],
+      "dense_results": [
+        "app_crash",
+        "fatal_err",
+        "appCrash"
+      ],
+      "hybrid_results": [
+        "app_crash",
+        "appCrash",
+        "fatal_err"
+      ],
+      "dense_precision_at_k": 1.0,
+      "hybrid_precision_at_k": 1.0
+    },
+    {
+      "query": "payment failure",
+      "relevant": [
+        "pay_fail",
+        "paymentFailed",
+        "payment_failure"
+      ],
+      "dense_results": [
+        "paymentFailed",
+        "payment_failure",
+        "pay_fail"
+      ],
+      "hybrid_results": [
+        "payment_failure",
+        "paymentFailed",
+        "pay_fail"
+      ],
+      "dense_precision_at_k": 1.0,
+      "hybrid_precision_at_k": 1.0
+    },
+    {
+      "query": "product view",
+      "relevant": [
+        "pdp_view",
+        "productViewed",
+        "product_view"
+      ],
+      "dense_results": [
+        "product_view",
+        "productViewed",
+        "pdp_view"
+      ],
+      "hybrid_results": [
+        "product_view",
+        "productViewed",
+        "pdp_view"
+      ],
+      "dense_precision_at_k": 1.0,
+      "hybrid_precision_at_k": 1.0
+    },
+    {
+      "query": "order complete",
+      "relevant": [
+        "orderCompleted",
+        "order_complete",
+        "purchase"
+      ],
+      "dense_results": [
+        "order_complete",
+        "purchase",
+        "orderCompleted"
+      ],
+      "hybrid_results": [
+        "order_complete",
+        "orderCompleted",
+        "purchase"
+      ],
+      "dense_precision_at_k": 1.0,
+      "hybrid_precision_at_k": 1.0
+    }
+  ],
+  "dense_mean_precision": 1.0,
+  "hybrid_mean_precision": 1.0
+}

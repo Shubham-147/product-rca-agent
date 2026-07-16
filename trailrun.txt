@@ -1,0 +1,250 @@
+PRODUCT DISCOVERY COPILOT — EXECUTION TRAIL AND APPLICATION FLOW
+================================================================
+
+Run all commands from the repository root:
+
+  /Users/home/capstone/product-rca-agent
+
+
+1. CREATE THE PYTHON ENVIRONMENT
+--------------------------------
+
+  python3 -m venv .venv
+  .venv/bin/python -m pip install -r requirements.txt
+
+This project uses the virtual-environment Python explicitly because some machines do not
+provide a `python` command on PATH.
+
+
+2. CONFIGURE THE APPLICATION
+----------------------------
+
+For offline demos and tests, no OpenAI key is required.
+
+For real OpenAI calls:
+
+  cp .env.example .env
+
+Edit .env and set:
+
+  OPENAI_API_KEY=your-key
+  OPENAI_MODEL=gpt-4o-mini
+
+Optional real retrieval models:
+
+  EMBEDDING_BACKEND=sentence-transformers
+  RERANKER_BACKEND=cross-encoder
+
+The default fake embedding and reranking backends are deterministic and avoid model-hub
+downloads. Secrets and model settings are loaded by src/config.py.
+
+
+3. GENERATE THE STUB DATA
+-------------------------
+
+  .venv/bin/python scripts/generate_stub_data.py
+
+This fixed-seed command creates:
+
+  data/taxonomy.json     Messy event taxonomy with aliases and dead events
+  data/events.csv        Synthetic user event stream
+  data/manifest.json     Blinded planted-fault ground truth for evaluation only
+
+The manifest must never be used by retrieval or Systems A/B/C.
+
+
+4. BUILD THE DUCKDB DATABASE
+----------------------------
+
+  .venv/bin/python -m src.retrieval.db
+
+This loads data/events.csv into:
+
+  data/events.duckdb
+
+Quick SQL check:
+
+  .venv/bin/python -c "from src.retrieval.db import run_sql; print(run_sql('SELECT COUNT(*) AS events FROM events'))"
+
+
+5. VERIFY TAXONOMY RETRIEVAL
+----------------------------
+
+Run the dense-only versus hybrid alias benchmark:
+
+  .venv/bin/python scripts/benchmark_retrieval.py
+
+Expected output artifact:
+
+  data/retrieval_benchmark.json
+
+Retrieval flow:
+
+  User phrase
+      |
+      +--> BM25 lexical candidates
+      |
+      +--> Chroma dense candidates
+      |
+      +--> union and deduplicate
+      |
+      +--> cross-encoder or fake reranker
+      |
+      '--> top taxonomy events
+
+
+6. RUN THE THREE RCA SYSTEMS OFFLINE
+------------------------------------
+
+System A — vanilla RAG baseline:
+
+  .venv/bin/python scripts/run_system_a.py
+
+Output:
+
+  data/system_a_demo.json
+
+System A retrieves taxonomy text and asks for a hypothesis. It intentionally performs no
+SQL or aggregation, so its affected cohort is not grounded in computed user IDs.
+
+
+System B — Pydantic AI ReAct agent:
+
+  .venv/bin/python scripts/run_system_b.py
+
+Output:
+
+  data/system_b_demo.json
+
+System B follows:
+
+  reason -> retrieve -> observe -> resolve_events -> observe -> run_sql
+         -> validated Hypothesis
+
+The offline runner uses a deterministic Pydantic AI function model but executes the real
+retrieval and DuckDB tools.
+
+
+System C — cyclic LangGraph pipeline:
+
+  .venv/bin/python scripts/run_system_c.py
+
+Output:
+
+  data/system_c_trace.json
+
+System C follows:
+
+  hypothesis_gen -> event_resolver -> sql_analyst -> validator -> falsifier
+        ^                                                       |
+        '----------- revise with disconfirming evidence --------'
+                                                                |
+                                                              report
+
+The checked scenario should show the Falsifier finding the old-device/Android OS
+confounder and forcing at least one revision before the final report.
+
+
+7. RUN THE COMPARATIVE EVALUATION
+---------------------------------
+
+  .venv/bin/python -m src.eval.harness
+
+Output:
+
+  data/eval_results.csv
+
+The harness runs Systems A, B, and C on the planted faults and decoy, then computes:
+
+  - attribution accuracy
+  - affected-cohort F1
+  - cause-versus-symptom rate
+  - decoy false-positive rate
+  - confounder resistance
+  - event-resolution precision and recall
+  - tool-call accuracy
+  - cost and latency per case
+  - detection at 2/4/8/16 percentage-point severity
+
+The final line prints the non-negotiable verdict:
+
+  System C must beat System A by at least 30 percentage points on attribution accuracy.
+
+
+8. RUN THE QUALITATIVE LLM JUDGE
+--------------------------------
+
+  .venv/bin/python scripts/run_judge.py
+
+Output:
+
+  data/judge_results.json
+
+The judge assigns a validated score from 1 to 5 plus a rationale. It measures whether a
+narrative follows from cited numbers and discloses what was not ruled out. The command also
+prints agreement against the five-row stub human-calibration set.
+
+
+9. RUN ALL TESTS
+----------------
+
+  .venv/bin/python -m pytest -q
+
+The suite is fully offline. Chroma, LangGraph, or OpenTelemetry may print upstream
+deprecation or telemetry warnings; warnings do not indicate a failure when pytest exits
+successfully.
+
+
+10. COMPLETE OFFLINE TRAIL RUN
+------------------------------
+
+Execute these commands in order for a fresh end-to-end run:
+
+  .venv/bin/python scripts/generate_stub_data.py
+  .venv/bin/python -m src.retrieval.db
+  .venv/bin/python scripts/benchmark_retrieval.py
+  .venv/bin/python scripts/run_system_a.py
+  .venv/bin/python scripts/run_system_b.py
+  .venv/bin/python scripts/run_system_c.py
+  .venv/bin/python -m src.eval.harness
+  .venv/bin/python scripts/run_judge.py
+  .venv/bin/python -m pytest -q
+
+
+OVERALL APPLICATION FLOW
+------------------------
+
+  Stub generator
+      |
+      +--> taxonomy.json --> hybrid event retrieval -----------+
+      |                                                         |
+      +--> events.csv --> events.duckdb --> SQL analysis -------+--> Systems A/B/C
+      |                                                                  |
+      '--> manifest.json -------------------------------------------------+--> Eval harness
+                                                                          |
+                                                         eval_results.csv + judge_results.json
+
+Trust boundary:
+
+  - Systems A/B/C may read taxonomy and events through retrieval and DuckDB.
+  - Only src/eval/metrics.py reads the blinded manifest in production code.
+  - Offline fake clients are explicitly injected and never silently replace real clients.
+
+
+COMMON TROUBLESHOOTING
+----------------------
+
+Missing OPENAI_API_KEY:
+  Offline scripts should still work. Real OpenAI clients require a populated .env file.
+
+Missing events.duckdb:
+  Run `.venv/bin/python -m src.retrieval.db` after generating the CSV.
+
+Missing generated JSON/CSV files:
+  Run `.venv/bin/python scripts/generate_stub_data.py`.
+
+Model download unavailable:
+  Keep EMBEDDING_BACKEND=fake and RERANKER_BACKEND=fake.
+
+Command `python` not found:
+  Use `.venv/bin/python` as shown throughout this runbook.

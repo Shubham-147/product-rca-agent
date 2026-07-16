@@ -1,0 +1,44 @@
+[
+  {
+    "question": "Why did checkout abandonment spike?",
+    "hypothesis": {
+      "mechanism": "A retrieved taxonomy event suggests a plausible funnel failure.",
+      "affected_cohort": "Users matching the symptom description; not SQL-derived",
+      "evidence": [
+        "Relevant taxonomy names and descriptions were retrieved"
+      ],
+      "confounders_ruled_out": [],
+      "confidence": 0.35
+    },
+    "grounded_in_query_results": false,
+    "grounding_note": "System A executed no SQL; affected_cohort is not a computed user set."
+  },
+  {
+    "question": "Why are older Android users crashing before adding to cart?",
+    "hypothesis": {
+      "mechanism": "A retrieved taxonomy event suggests a plausible funnel failure.",
+      "affected_cohort": "Users matching the symptom description; not SQL-derived",
+      "evidence": [
+        "Relevant taxonomy names and descriptions were retrieved"
+      ],
+      "confounders_ruled_out": [],
+      "confidence": 0.35
+    },
+    "grounded_in_query_results": false,
+    "grounding_note": "System A executed no SQL; affected_cohort is not a computed user set."
+  },
+  {
+    "question": "Why did payment completion fall for one provider?",
+    "hypothesis": {
+      "mechanism": "A retrieved taxonomy event suggests a plausible funnel failure.",
+      "affected_cohort": "Users matching the symptom description; not SQL-derived",
+      "evidence": [
+        "Relevant taxonomy names and descriptions were retrieved"
+      ],
+      "confounders_ruled_out": [],
+      "confidence": 0.35
+    },
+    "grounded_in_query_results": false,
+    "grounding_note": "System A executed no SQL; affected_cohort is not a computed user set."
+  }
+]

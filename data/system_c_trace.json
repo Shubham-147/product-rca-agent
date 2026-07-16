@@ -1,0 +1,163 @@
+{
+  "final_hypothesis": {
+    "mechanism": "Android 10 within the old-device cohort causes pre-cart application crashes; device age alone is not sufficient.",
+    "affected_cohort": [
+      "user_0007",
+      "user_0134",
+      "user_0164",
+      "user_0182",
+      "user_0199",
+      "user_0215",
+      "user_0232",
+      "user_0252",
+      "user_0267",
+      "user_0287",
+      "user_0288",
+      "user_0358",
+      "user_0371",
+      "user_0391",
+      "user_0395",
+      "user_0405",
+      "user_0414",
+      "user_0437",
+      "user_0489",
+      "user_0498",
+      "user_0581",
+      "user_0605",
+      "user_0614",
+      "user_0635",
+      "user_0709"
+    ],
+    "evidence": [
+      "DuckDB test returned 25 affected users; query=SELECT device_tier,\n                   COUNT(DISTINCT user_id) AS users,\n                   COUNT(DISTINCT CASE WHEN outcome = 'crash' THEN user_id END) AS crash_users,\n                   COUNT(DISTINCT CASE WHEN outcome = 'crash' THEN user_id END)::DOUBLE\n                       / COUNT(DISTINCT user_id) AS crash_rate\n            FROM events GROUP BY device_tier ORDER BY device_tier",
+      "DuckDB test returned 25 affected users; query=SELECT DISTINCT user_id FROM events WHERE device_tier = 'old' AND os = 'Android_10' AND outcome = 'crash' ORDER BY user_id"
+    ],
+    "confounders_ruled_out": [
+      "device tier alone; OS-stratified falsification check performed"
+    ],
+    "confidence": 0.9
+  },
+  "ruled_out_reason": null,
+  "revision_count": 1,
+  "confounders_found": [
+    "OS confounding / Simpson-style aggregate risk: old-device crashes concentrate in Android_10 (0.287 vs 0.000)."
+  ],
+  "state_trace": [
+    {
+      "node": "hypothesis_gen",
+      "revision": 0,
+      "mechanism": "Old device hardware directly causes pre-cart application crashes.",
+      "used_disconfirming_evidence": null
+    },
+    {
+      "node": "event_resolver",
+      "query": "application crash",
+      "resolved_events": [
+        "app_crash",
+        "appCrash",
+        "fatal_err",
+        "app_open",
+        "cold_start"
+      ]
+    },
+    {
+      "node": "sql_analyst",
+      "revision": 0,
+      "query": "SELECT device_tier, COUNT(DISTINCT user_id) AS users, COUNT(DISTINCT CASE WHEN outcome = 'crash' THEN user_id END) AS crash_users, COUNT(DISTINCT CASE WHEN outcome = 'crash' THEN user_id END)::DOUBLE / COUNT(DISTINCT user_id) AS crash_rate FROM events GROUP BY device_tier ORDER BY device_tier",
+      "row_count": 3,
+      "affected_user_count": 25
+    },
+    {
+      "node": "validator",
+      "passed": true,
+      "checks": {
+        "resolved_event_present": true,
+        "sql_cohort_non_empty": true,
+        "evidence_present": true
+      }
+    },
+    {
+      "node": "falsifier",
+      "revision": 0,
+      "falsified": true,
+      "confounder": "OS confounding / Simpson-style aggregate risk: old-device crashes concentrate in Android_10 (0.287 vs 0.000).",
+      "route": "revise",
+      "checks": {
+        "decoy_checked": false,
+        "stratification_checked": true,
+        "old_device_os_rates": [
+          {
+            "device_tier": "old",
+            "os": "Android_10",
+            "users": 87,
+            "crash_users": 25,
+            "crash_rate": 0.2873563218
+          },
+          {
+            "device_tier": "old",
+            "os": "Android_14",
+            "users": 44,
+            "crash_users": 0,
+            "crash_rate": 0.0
+          },
+          {
+            "device_tier": "old",
+            "os": "iOS_17",
+            "users": 32,
+            "crash_users": 0,
+            "crash_rate": 0.0
+          }
+        ]
+      }
+    },
+    {
+      "node": "hypothesis_gen",
+      "revision": 1,
+      "mechanism": "Android 10 within the old-device cohort causes pre-cart application crashes; device age alone is not sufficient.",
+      "used_disconfirming_evidence": "OS confounding / Simpson-style aggregate risk: old-device crashes concentrate in Android_10 (0.287 vs 0.000)."
+    },
+    {
+      "node": "event_resolver",
+      "query": "application crash",
+      "resolved_events": [
+        "app_crash",
+        "appCrash",
+        "fatal_err",
+        "app_open",
+        "cold_start"
+      ]
+    },
+    {
+      "node": "sql_analyst",
+      "revision": 1,
+      "query": "SELECT DISTINCT user_id FROM events WHERE device_tier = 'old' AND os = 'Android_10' AND outcome = 'crash' ORDER BY user_id",
+      "row_count": 25,
+      "affected_user_count": 25
+    },
+    {
+      "node": "validator",
+      "passed": true,
+      "checks": {
+        "resolved_event_present": true,
+        "sql_cohort_non_empty": true,
+        "evidence_present": true
+      }
+    },
+    {
+      "node": "falsifier",
+      "revision": 1,
+      "falsified": false,
+      "confounder": null,
+      "route": "report",
+      "checks": {
+        "decoy_checked": false,
+        "stratification_checked": false
+      }
+    },
+    {
+      "node": "report",
+      "status": "validated",
+      "affected_user_count": 25
+    }
+  ]
+}

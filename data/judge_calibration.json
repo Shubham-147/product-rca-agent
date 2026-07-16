@@ -1,0 +1,67 @@
+[
+  {
+    "sample_id": "stub_1",
+    "symptom": "Checkout abandonment increased.",
+    "hypothesis": {
+      "mechanism": "Checkout latency caused abandonment.",
+      "affected_cohort": ["user_0001", "user_0002"],
+      "evidence": ["2 of 2 cited sessions had latency above 4.5 seconds."],
+      "confounders_ruled_out": ["device tier"],
+      "confidence": 0.9
+    },
+    "human_score": 5,
+    "stub_judge_score": 5
+  },
+  {
+    "sample_id": "stub_2",
+    "symptom": "Payments declined.",
+    "hypothesis": {
+      "mechanism": "Provider errors blocked payment.",
+      "affected_cohort": ["user_0003"],
+      "evidence": ["One provider_error row was cited."],
+      "confounders_ruled_out": [],
+      "confidence": 0.7
+    },
+    "human_score": 4,
+    "stub_judge_score": 4
+  },
+  {
+    "sample_id": "stub_3",
+    "symptom": "Crash reports increased.",
+    "hypothesis": {
+      "mechanism": "Android crashes may explain the increase.",
+      "affected_cohort": "Older Android users",
+      "evidence": ["Crash counts were higher for older devices."],
+      "confounders_ruled_out": [],
+      "confidence": 0.55
+    },
+    "human_score": 3,
+    "stub_judge_score": 3
+  },
+  {
+    "sample_id": "stub_4",
+    "symptom": "Home render fell.",
+    "hypothesis": {
+      "mechanism": "Cold start definitely caused every missing render.",
+      "affected_cohort": "Cold-start users",
+      "evidence": ["Cold starts and missing renders were correlated."],
+      "confounders_ruled_out": [],
+      "confidence": 0.9
+    },
+    "human_score": 2,
+    "stub_judge_score": 3
+  },
+  {
+    "sample_id": "stub_5",
+    "symptom": "Users skip a promotion.",
+    "hypothesis": {
+      "mechanism": "A catastrophic checkout outage caused promo skips.",
+      "affected_cohort": "All users",
+      "evidence": ["The promo_skip event exists."],
+      "confounders_ruled_out": [],
+      "confidence": 0.95
+    },
+    "human_score": 1,
+    "stub_judge_score": 1
+  }
+]

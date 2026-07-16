@@ -1,0 +1,4 @@
+system,attribution_top1_recall3,cohort_id_f1,cause_vs_symptom_rate,false_positive_rate_on_decoys,confounder_resistance,event_resolution_precision,event_resolution_recall,tool_call_accuracy,cost_per_case_usd,latency_per_case_seconds,detection_at_2pp,detection_at_4pp,detection_at_8pp,detection_at_16pp
+System A,0.0,0.0,0.0,1.0,0.0,0.23333333333333336,0.75,0.7222222222222222,0.0,0.017503139000230778,0.0,0.0,0.0,0.0
+System B,1.0,1.0,0.5,1.0,0.0,0.23333333333333336,0.75,0.75,0.0,0.010264791499745721,1.0,1.0,1.0,1.0
+System C,1.0,1.0,0.8333333333333334,0.0,1.0,0.3,1.0,0.9444444444444445,0.0,0.01590673600003356,1.0,1.0,1.0,1.0
