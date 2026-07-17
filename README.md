@@ -11,12 +11,16 @@ claims.
 
 - [Architecture](#architecture)
 - [Quick start](#quick-start)
+- [Configuration](#configuration)
+- [JSON API](#json-api)
 - [Data and ground truth](#data-and-ground-truth)
 - [Retrieval](#retrieval)
 - [Root-cause systems](#root-cause-systems)
 - [Evaluation](#evaluation)
+- [Generated artifacts](#generated-artifacts)
 - [What's stubbed / what's real](#whats-stubbed--whats-real)
 - [Repository map](#repository-map)
+- [Testing and troubleshooting](#testing-and-troubleshooting)
 - [Next steps](#next-steps)
 - [Build log](#build-log)
 
@@ -90,6 +94,122 @@ cp .env.example .env
 `OPENAI_MODEL` defaults to `gpt-4o-mini`. Credentials and model selection are loaded only
 through `src.config.get_settings()`; they are never hardcoded in system modules.
 
+For a command-by-command operational walkthrough, see [`trailrun.txt`](trailrun.txt).
+
+## Configuration
+
+All configuration is environment-based. `src/config.py` loads the project `.env` and
+raises a clear error when a real OpenAI client is requested without an API key.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `OPENAI_API_KEY` | none | Required only for `openai` execution mode |
+| `OPENAI_MODEL` | `gpt-4o-mini` | Shared OpenAI and Pydantic AI model |
+| `EMBEDDING_BACKEND` | `fake` | `fake` or `sentence-transformers` |
+| `SENTENCE_TRANSFORMER_MODEL` | `all-MiniLM-L6-v2` | Real dense embedding model |
+| `RERANKER_BACKEND` | `fake` | `fake` or `cross-encoder` |
+| `CROSS_ENCODER_MODEL` | `cross-encoder/ms-marco-MiniLM-L-6-v2` | Real reranking model |
+| `EVENTS_DB_PATH` | `data/events.duckdb` | Optional DuckDB override, mainly for tests |
+
+`offline` mode is deterministic and makes no paid calls. `openai` mode uses these settings
+for Systems A/B and qualitative judging. System C's current graph nodes remain
+deterministic and data-driven in both modes.
+
+The project uses `pydantic-ai-slim[openai]`: it provides the `pydantic_ai` package and
+OpenAI provider without unrelated provider extras whose telemetry dependencies conflict
+with Chroma.
+
+## JSON API
+
+FastAPI exposes the complete pipeline as structured JSON. There is no custom web UI;
+Swagger is the interactive client.
+
+```bash
+.venv/bin/python -m uvicorn src.api:app --reload
+```
+
+- Swagger: `http://127.0.0.1:8000/docs`
+- OpenAPI JSON: `http://127.0.0.1:8000/openapi.json`
+- Health check: `http://127.0.0.1:8000/health`
+
+### Endpoints
+
+| Method and path | Purpose |
+| --- | --- |
+| `GET /health` | Return `{"status":"ok"}` for liveness checks |
+| `POST /execute` | Run selected systems for one symptom, optionally with evaluation/judging |
+| `POST /execute/full` | Run A/B/C, comparative evaluation, and qualitative judging |
+
+`POST /execute` parameters:
+
+| Parameter | Required/default | Meaning |
+| --- | --- | --- |
+| `symptom` | **required** | Product symptom or root-cause question |
+| `systems` | `a`, `b`, `c` | Repeatable system selection; all three are the default |
+| `mode` | `offline` | Deterministic `offline` models or configured `openai` models |
+| `regenerate_data` | `false` | Recreate stub files and rebuild DuckDB before execution |
+| `include_evaluation` | `false` | Run the complete blinded comparative harness |
+| `include_judge` | `false` | Attach a validated 1–5 score and rationale |
+| `max_iterations` | `3` | System C revision cap, from 0 through 10 |
+
+`POST /execute/full` requires `symptom`, accepts `mode`, `regenerate_data`, and
+`max_iterations`, and always enables all systems, evaluation, and judging.
+
+Example selected-system request:
+
+```bash
+curl -X POST \
+  'http://127.0.0.1:8000/execute?symptom=Why%20did%20checkout%20abandonment%20spike%3F&systems=b&mode=offline&include_judge=true'
+```
+
+Example complete request:
+
+```bash
+curl -X POST \
+  'http://127.0.0.1:8000/execute/full?symptom=Why%20are%20older%20Android%20users%20crashing%20before%20cart%3F&mode=offline'
+```
+
+Response shape (values abbreviated):
+
+```json
+{
+  "symptom": "Why did checkout abandonment spike?",
+  "mode": "offline",
+  "setup": {
+    "data_regenerated": false,
+    "database_rebuilt": false,
+    "generated_event_rows": null,
+    "database_rows_loaded": null,
+    "data_directory": "/absolute/path/to/data"
+  },
+  "results": [
+    {
+      "system": "System B",
+      "hypothesis": {
+        "mechanism": "...",
+        "affected_cohort": ["user_0001"],
+        "evidence": ["..."],
+        "confounders_ruled_out": [],
+        "confidence": 0.82
+      },
+      "ruled_out_reason": null,
+      "grounded_in_query_results": true,
+      "tool_calls": [],
+      "state_trace": [],
+      "judge": {"score": 4, "rationale": "..."},
+      "latency_seconds": 0.01
+    }
+  ],
+  "evaluation": null,
+  "total_latency_seconds": 0.02
+}
+```
+
+Missing data is generated automatically. `regenerate_data=true` forces a fresh fixed-seed
+build. Invalid parameters return HTTP 422; runtime configuration and pipeline errors
+return HTTP 400 with a `detail` message. Requests are synchronous, so `/execute/full` is a
+batch endpoint rather than a low-latency serving path.
+
 ## Data and ground truth
 
 The Phase 1 stand-in creates 65 deliberately inconsistent taxonomy entries and a 750-user,
@@ -148,6 +268,9 @@ lexically close to `checkout_start` but can be semantically invisible to embeddi
 Dense retrieval adds conceptual recall, Chroma stores vectors, and the cross-encoder
 reranks the combined candidate set in the context of the original query. Dense-only
 retrieval is therefore not accepted as the sole taxonomy strategy.
+
+Chroma persists its local index under `data/chroma/`. That directory is ignored by Git;
+one process-wide client lets FastAPI worker threads safely reuse the same collections.
 
 Real dense retrieval uses sentence-transformers (`all-MiniLM-L6-v2` by default), while
 real reranking uses `cross-encoder/ms-marco-MiniLM-L-6-v2`. Select backends in `.env`:
@@ -224,6 +347,17 @@ The falsifiable commitment rule is: **“System C beats System A by ≥30pp on a
 accuracy.”** The evaluator prints `SYSTEM C WINS` or `SYSTEM C LOSES` from that rule and
 does not reinterpret an underperforming result.
 
+Current deterministic-stub snapshot:
+
+| System | Attribution | Cohort F1 | Decoy FPR | Confounder resistance |
+| --- | ---: | ---: | ---: | ---: |
+| System A | 0% | 0% | 100% | 0% |
+| System B | 100% | 100% | 100% | 0% |
+| System C | 100% | 100% | 0% | 100% |
+
+The current commitment verdict is `SYSTEM C WINS` with a 100-percentage-point margin.
+These values describe the small deterministic stub, not expected production performance.
+
 ### Evidence-faithfulness judge
 
 The LLM judge grades a single answer using this fixed rubric:
@@ -237,6 +371,26 @@ The LLM judge grades a single answer using this fixed rubric:
 **Judge–human agreement is reported, not assumed.** The five-row placeholder calibration
 reports 80% exact agreement and Pearson `r=0.959`. Those figures validate wiring only;
 real calibration requires approximately 30 human-labelled samples.
+
+## Generated artifacts
+
+| Path | Produced by | Contents |
+| --- | --- | --- |
+| `data/taxonomy.json` | `scripts/generate_stub_data.py` | Event definitions, aliases, descriptions, dead-event flags |
+| `data/events.csv` | `scripts/generate_stub_data.py` | Synthetic user-level event stream |
+| `data/manifest.json` | `scripts/generate_stub_data.py` | Blinded planted faults, cohorts, expected events, severities |
+| `data/events.duckdb` | `python -m src.retrieval.db` | Typed local `events` table; ignored by Git |
+| `data/chroma/` | Dense retrieval | Persistent local vector index; ignored by Git |
+| `data/retrieval_benchmark.json` | `scripts/benchmark_retrieval.py` | Dense-only versus hybrid alias results |
+| `data/system_a_demo.json` | `scripts/run_system_a.py` | Ungrounded baseline hypotheses |
+| `data/system_b_demo.json` | `scripts/run_system_b.py` | ReAct hypotheses and tool traces |
+| `data/system_c_trace.json` | `scripts/run_system_c.py` | Full cyclic graph state trace |
+| `data/eval_results.csv` | `python -m src.eval.harness` | Comparative metric table |
+| `data/judge_calibration.json` | checked fixture | Placeholder human/judge calibration labels |
+| `data/judge_results.json` | `scripts/run_judge.py` | Qualitative scores and rationales |
+
+Regeneration overwrites the fixed-seed taxonomy, events, and manifest. Evaluation code may
+read the manifest; retrieval and Systems A/B/C must not.
 
 ## What's stubbed / what's real
 
@@ -260,6 +414,8 @@ code does not silently fall back to them.
 ```text
 data/                  generated taxonomy, events, DuckDB, blinded truth, results
 scripts/               reproducible generators, benchmarks, and system demos
+trailrun.txt            command-by-command local execution runbook
+src/api.py              FastAPI, Swagger, JSON execution endpoints
 src/config.py          centralized environment settings
 src/generator/         deterministic Phase 1 stand-in
 src/retrieval/         DuckDB, BM25, dense search, reranking, hybrid resolver
@@ -267,6 +423,34 @@ src/systems/           shared schemas/client and Systems A, B, C
 src/eval/              quantitative metrics, harness, qualitative judge
 tests/                 offline acceptance and regression tests
 ```
+
+## Testing and troubleshooting
+
+Run the complete suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+The current suite contains 29 passing tests covering configuration, generation, DuckDB,
+retrieval, reranking, all three systems, evaluation, judging, and FastAPI/OpenAPI behavior.
+Tests are offline and do not require `OPENAI_API_KEY`.
+
+Common issues:
+
+- **`python` not found:** use `.venv/bin/python` as shown in every command.
+- **Missing generated files:** run `scripts/generate_stub_data.py`.
+- **Missing `events.duckdb`:** run `python -m src.retrieval.db` with the venv Python.
+- **Missing OpenAI key:** use `mode=offline`, or populate `.env` before real calls.
+- **Model-hub access unavailable:** retain `EMBEDDING_BACKEND=fake` and
+  `RERANKER_BACKEND=fake`.
+- **Chroma/LangGraph/OpenTelemetry warnings:** current dependencies emit upstream
+  deprecation or disabled-telemetry warnings under Python 3.14; warnings are not failures
+  when pytest or the requested command exits successfully.
+- **Slow `/execute/full`:** it synchronously runs all systems, all benchmark cases, and the
+  judge. Use `/execute` with selected systems for interactive requests.
+
+For the exact fresh-run order and expected outputs, use [`trailrun.txt`](trailrun.txt).
 
 ## Next steps
 
@@ -295,3 +479,4 @@ tests/                 offline acceptance and regression tests
 | 10 | Quantitative eval | Comparative metrics, severity curve, commitment verdict |
 | 11 | Qualitative eval | Evidence-faithfulness judge and calibration mechanism |
 | 12 | Consolidation | Contributor-oriented architecture and operating guide |
+| 13 | JSON API | FastAPI execution endpoints, Swagger contract, worker-safe Chroma persistence |

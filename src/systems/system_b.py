@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import pandas as pd
+import duckdb
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.models import Model
 from pydantic_ai.models.openai import OpenAIModel
@@ -77,10 +78,49 @@ def _resolve_events_tool(
 
 
 def _run_sql_tool(ctx: RunContext[SystemBDeps], query: str) -> list[dict[str, Any]]:
-    """Run a DuckDB query and return JSON-safe records for reasoning."""
-    frame = ctx.deps.sql_fn(query)
+    """Run DuckDB SQL, returning schema feedback on invalid queries so they can be retried."""
+    try:
+        frame = ctx.deps.sql_fn(query)
+    except duckdb.Error as exc:
+        error = str(exc)
+        ctx.deps.tool_calls.append(
+            {
+                "tool": "run_sql",
+                "query": query,
+                "rows": 0,
+                "success": False,
+                "error": error,
+            }
+        )
+        return [
+            {
+                "error": error,
+                "instruction": "Correct the SQL and call run_sql again.",
+                "available_columns": [
+                    "user_id",
+                    "session_id",
+                    "timestamp",
+                    "event_name",
+                    "screen",
+                    "category",
+                    "device_tier",
+                    "os",
+                    "cold_start",
+                    "latency_ms",
+                    "payment_provider",
+                    "outcome",
+                ],
+            }
+        ]
     records = json.loads(frame.to_json(orient="records", date_format="iso"))
-    ctx.deps.tool_calls.append({"tool": "run_sql", "query": query, "rows": len(records)})
+    ctx.deps.tool_calls.append(
+        {
+            "tool": "run_sql",
+            "query": query,
+            "rows": len(records),
+            "success": True,
+        }
+    )
     return records
 
 
@@ -89,6 +129,14 @@ Reason about the symptom, call retrieve and resolve_events for context, then cal
 to compute the actually affected users or cohort. Repeat tools if needed. Never invent
 user IDs. Your final Hypothesis must cite SQL observations in evidence, use a non-empty
 affected_cohort grounded in those results, and list only confounders genuinely tested.
+
+The DuckDB table is named events and has exactly these columns:
+user_id VARCHAR, session_id VARCHAR, timestamp TIMESTAMPTZ, event_name VARCHAR,
+screen VARCHAR, category VARCHAR, device_tier VARCHAR, os VARCHAR, cold_start BOOLEAN,
+latency_ms BIGINT, payment_provider VARCHAR, outcome VARCHAR.
+The timestamp column is named timestamp, not event_ts. Use only listed columns. If run_sql
+returns an error, inspect its available_columns, correct the query, and call run_sql again
+before producing the final Hypothesis.
 """
 
 

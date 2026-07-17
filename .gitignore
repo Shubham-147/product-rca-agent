@@ -219,3 +219,4 @@ __marimo__/
 
 # Project-specific generated data
 data/*.duckdb
+data/chroma/

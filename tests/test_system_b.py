@@ -1,11 +1,13 @@
 """Acceptance tests for the typed Pydantic AI ReAct system."""
 
 import json
+from types import SimpleNamespace
 
 from scripts.run_system_a import QUESTIONS
 from scripts.run_system_b import offline_react_model, run_demo
 from src.systems.schema import Hypothesis
-from src.systems.system_b import SystemB
+from src.systems.system_b import SystemB, SystemBDeps, _run_sql_tool
+from src.retrieval.db import run_sql
 
 
 def test_system_b_uses_all_tools_and_returns_real_users() -> None:
@@ -38,3 +40,14 @@ def test_system_b_demo_grounds_same_questions_as_system_a(tmp_path) -> None:
     )
     assert json.loads(output.read_text()) == records
 
+
+def test_invalid_sql_returns_schema_feedback_instead_of_crashing() -> None:
+    deps = SystemBDeps(sql_fn=run_sql)
+    result = _run_sql_tool(
+        SimpleNamespace(deps=deps),
+        "SELECT event_ts FROM events",
+    )
+
+    assert result[0]["error"]
+    assert "timestamp" in result[0]["available_columns"]
+    assert deps.tool_calls[-1]["success"] is False

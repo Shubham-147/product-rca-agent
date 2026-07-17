@@ -195,6 +195,20 @@ deprecation or telemetry warnings; warnings do not indicate a failure when pytes
 successfully.
 
 
+9A. RUN THE JSON FASTAPI
+------------------------
+
+  .venv/bin/python -m uvicorn src.api:app --reload
+
+Swagger:
+
+  http://127.0.0.1:8000/docs
+
+Use POST /execute for selected systems, or POST /execute/full to run Systems A/B/C,
+comparative evaluation, and qualitative judging. Swagger asks for the required symptom
+and optional execution parameters. Responses are JSON; no custom UI is included.
+
+
 10. COMPLETE OFFLINE TRAIL RUN
 ------------------------------
 
