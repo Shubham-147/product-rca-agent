@@ -18,7 +18,7 @@ class HybridRetriever:
         self.chunks={c.chunk_id:c for c in chunks};self.sparse=BM25Index();self.sparse.build(chunks)
         self.dense=dense_index;self.reranker=reranker or LexicalFallbackReranker();self.rrf_constant=rrf_constant;self.max_per_parent=max_per_parent
     def build_dense(self,batch_size=64):self.dense.index(list(self.chunks.values()),batch_size)
-    def retrieve(self,query,mode,top_k=8,metadata_filters=None,allow_parent_duplicates=False):
+    def retrieve(self,query,mode,top_k=5,metadata_filters=None,allow_parent_duplicates=False):
         mode=RetrievalMode(mode);types=MODE_TYPES[mode];dw,sw=MODE_WEIGHTS[mode]
         sparse=self.sparse.search(query,20,types);dense=self.dense.search(query,20,types)
         fused=reciprocal_rank_fusion([x[0] for x in dense],[x[0].chunk_id for x in sparse],self.rrf_constant,dw,sw)

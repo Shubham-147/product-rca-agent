@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from src.analytics import SUPPORTED_DIMENSIONS, SUPPORTED_METRICS
 from src.database import QueryResult
 from src.guardrails import BLOCKED_PATTERNS, GuardrailError, compile_cohort, require_resolved_event
+from src.observability import log_retrieved_chunks
 from src.retrieval import RetrievalMode
 from src.schemas import CohortDefinition
 
@@ -89,6 +90,8 @@ class SystemBTools:
             hits = self.deps.retriever.retrieve(query, args.retrieval_mode, top_k=args.top_k)
             chunks = [hit.chunk for hit in hits if hit.chunk.document_type in allowed][:args.top_k]
             self.deps.source_chunks.update(chunk.chunk_id for chunk in chunks)
+            log_retrieved_chunks(self.deps.run_logger,system_name="system_b",
+              stage=f"tool_result:{args.retrieval_mode.value}",chunks=chunks)
             return [{"chunk_id": c.chunk_id, "document_type": c.document_type,
                      "text": c.text, "metadata": c.metadata} for c in chunks]
         return self._execute("search_knowledge", "retrieval", args, call)

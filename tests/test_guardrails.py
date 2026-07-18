@@ -4,6 +4,7 @@ import pytest
 from pydantic import BaseModel
 from src.database import QueryResult
 from src.guardrails import *
+from src.observability import retrieval_chunk_descriptors,write_daily_openai_payload
 from src.retrieval.schemas import CanonicalCandidate,Chunk,EventResolution
 from src.schemas import AnalysisRequest,CohortDefinition,Evidence,RCAReport,RootCauseHypothesis,RunMetadata
 
@@ -89,3 +90,18 @@ def test_safe_logging_redacts_secrets_and_large_sets():
     record=SafeAuditLogger().log(tool="sql",parameters={"api_key":"secret","users":list(range(30))},query_id="q")
     assert record["parameters"]["api_key"]=="[REDACTED]"
     assert "REDACTED COLLECTION" in record["parameters"]["users"]
+
+def test_retrieval_chunk_logging_is_bounded_and_redacted():
+    chunks=[Chunk(chunk_id="prd1",document_type="prd",document_id="d",text="A "*400,content_hash="h"),
+      {"chunk_id":"ticket1","document_type":"ticket","text":"authorization token must stay secret"}]
+    records=retrieval_chunk_descriptors(chunks)
+    assert records[0]["chunk_id"]=="prd1" and len(records[0]["preview"])==300
+    assert records[0]["character_count"]==800
+    assert records[1]["preview"]=="[REDACTED]"
+
+def test_daily_openai_payload_log_excludes_credentials(tmp_path):
+    target=write_daily_openai_payload(system_name="system_a",stage="test",model="test",
+      payload={"messages":[{"content":"checkout context"}],"api_key":"must-not-appear"},log_root=tmp_path/"log")
+    record=target.read_text()
+    assert target.parent.name=="log" and target.suffix==".txt"
+    assert "checkout context" in record and "must-not-appear" not in record and "[REDACTED]" in record

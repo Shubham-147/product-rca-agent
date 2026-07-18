@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Literal
 import re
 from pydantic import BaseModel,ConfigDict,Field,field_validator
+from src.guardrails import GuardrailError,validate_analysis_text
 from src.schemas import AnalysisRequest,RCAReport,TimeWindow
 
 class APIModel(BaseModel):
@@ -15,16 +16,18 @@ class AnalysisAPIRequest(APIModel):
     suspected_screen:str|None=Field(default=None,max_length=100)
     incident_window:TimeWindow|None=None
     baseline_window:TimeWindow|None=None
-    @field_validator("symptom")
+    @field_validator("symptom","funnel_name","suspected_screen")
     @classmethod
     def reject_control_or_protected_content(cls,value):
+        if value is None:return value
         lowered=value.lower()
         blocked=("manifest","ground_truth","planted_fault","fault_manifest","scorer","chain-of-thought",
           "system prompt","ignore previous","api key","tool budget","database path")
         if any(term in lowered for term in blocked):raise ValueError("symptom contains protected or control content")
         if re.search(r"\b(select|insert|update|delete|drop|alter|attach|copy|install|load)\b[\s\S]*\b(from|into|table|database)\b",lowered):
             raise ValueError("symptom must not contain SQL")
-        return value
+        try:return validate_analysis_text(value)
+        except GuardrailError as exc:raise ValueError("analysis text must not contain executable code or instruction overrides") from exc
     def to_domain(self)->AnalysisRequest:return AnalysisRequest.model_validate(self.model_dump())
 
 class SafeError(APIModel):

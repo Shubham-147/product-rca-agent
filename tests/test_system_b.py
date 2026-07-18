@@ -9,7 +9,7 @@ from src.retrieval.schemas import AliasMapping,CanonicalCandidate,Chunk,EventRes
 from src.schemas import AnalysisRequest,CohortDefinition,RCAReport
 from src.systems.system_b.agent import PydanticAIRunner,SystemBAgent,_unresolved_report_events
 from src.systems.system_b.dependencies import QueryCache,SystemBDependencies
-from src.systems.system_b.output_validator import draft_evidence_errors
+from src.systems.system_b.output_validator import draft_evidence_errors,validate_system_b_output
 from src.systems.system_b.tools import *
 
 class Manager:
@@ -126,3 +126,15 @@ def test_output_repair_exhaustion_returns_truthful_unresolved_report(tmp_path):
     assert report.unresolved_questions
     assert report.run_metadata.status.value=="completed"
     assert deps.safe_query_executor.runs[-1]["metadata"]["output_repair_exhausted"] is True
+
+def test_unsupported_report_content_is_sanitized_instead_of_failing(tmp_path):
+    deps=make_deps(tmp_path)
+    raw=CompleteRunner().run_sync("",deps=deps)
+    raw["hypotheses"][0]["resolved_events"].append("payment_submit")
+    raw["hypotheses"][0]["evidence"][0]["observed_value"]=.99
+    report=RCAReport.model_validate(raw)
+    settings=AppSettings(source_duckdb_path=tmp_path/"s",runtime_duckdb_path=tmp_path/"r",chroma_persist_path=tmp_path/"c")
+    cleaned=validate_system_b_output(report,AnalysisRequest(instance_id="inst_003",symptom="checkout declined"),deps,settings)
+    assert cleaned.hypotheses[0].resolved_events==["order_confirmed"]
+    assert [e.evidence_id for e in cleaned.hypotheses[0].evidence]==["e2"]
+    assert "omitted 1 unsupported evidence" in cleaned.hypotheses[0].limitations[-1]

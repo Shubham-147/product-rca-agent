@@ -38,7 +38,7 @@ def chunk_prd(doc: PRDDocument) -> list[Chunk]:
     out=[]
     def walk(section,path):
         key="/".join([*path,section.heading]); body=f"{section.heading}\n{section.content}"
-        for pi,parent_text in enumerate(_windows(body,1000,50)):
+        for pi,parent_text in enumerate(_windows(body,800,50)):
             parent=_chunk("prd",doc.document_id,f"{key}:p{pi}",parent_text,
                           {"title":doc.title,"version":doc.version,"heading":section.heading,"level":"parent"})
             out.append(parent)

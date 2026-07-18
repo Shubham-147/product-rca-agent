@@ -101,3 +101,7 @@ def test_mocked_complete_graph_terminates_and_materializes(tmp_path):
     d=deps(tmp_path);report=SystemCWorkflow(d).run(AnalysisRequest(instance_id="inst_003",symptom="checkout conversion declined",funnel_name="shopfunnel"))
     assert len(report.hypotheses)==3 and d.analytics.materialized==["h0","h1","h2"]
     assert d.guard.nodes<=d.settings.system_c_max_node_executions and d.manager.runs[-1]["validated"]
+
+def test_reporter_deduplicates_repeated_resolution_warnings(tmp_path):
+    d=deps(tmp_path);report=SystemCWorkflow(d).run(AnalysisRequest(instance_id="inst_003",symptom="checkout conversion declined"))
+    assert len(report.unresolved_questions)==len(set(report.unresolved_questions))

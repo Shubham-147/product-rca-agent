@@ -86,7 +86,7 @@ not place credentials in source code, request payloads, or shell history.
 | `RCA_SYSTEM_B_MAX_RETRIEVAL_CALLS` | `4` | System B retrieval budget |
 | `RCA_SYSTEM_B_MAX_ANALYTICAL_CALLS` | `10` | System B analytical budget |
 | `RCA_SYSTEM_C_MAX_REVISIONS` | `2` | System C revision limit |
-| `RCA_SYSTEM_C_MAX_NODE_EXECUTIONS` | `30` | System C graph execution limit |
+| `RCA_SYSTEM_C_MAX_NODE_EXECUTIONS` | `60` | System C graph limit sized for three candidates and two revisions each |
 | `RCA_TOOL_TIMEOUT_SECONDS` | `30` | Per-tool timeout |
 | `RCA_NODE_TIMEOUT_SECONDS` | `60` | Per-node timeout |
 | `RCA_QUERY_TIMEOUT_SECONDS` | `30` | Query timeout |
@@ -234,7 +234,9 @@ To run one system, replace `/compare` with one of:
 - `/api/v1/analyse/system-c`
 
 The API request does not accept SQL, model names, paths, prompts, manifests, or
-budget overrides. Extra fields are rejected by schema validation.
+budget overrides. Executable code, script tags, shell commands, dynamic execution
+calls, and instruction-override attempts are rejected in all user-controlled text
+fields. Extra fields are rejected by schema validation.
 
 ## 9. Verify a completed run
 
@@ -245,6 +247,17 @@ A successful response has `status: "completed"` and an `RCAReport` containing:
 - query IDs for numerical evidence;
 - source chunk IDs for product facts;
 - run metadata with run ID, system name, timestamps, and completed status.
+
+Immediately before retrieved product context is supplied to an LLM, the server
+logs `pre_llm_retrieval_context` records containing each chunk ID, document type,
+character count, and a preview capped at 300 characters. Sensitive-looking text
+is redacted; raw telemetry and complete documents are never logged.
+
+The logical provider request payload is also appended immediately before each
+OpenAI call to `log/YYYY-MM-DD.txt`. Each line is a JSON record with timestamp,
+system, stage, model, and payload. Provider credentials are never included. These
+files may contain user symptoms, retrieved product context, and aggregate evidence;
+they are Git-ignored and must be handled as local diagnostic data.
 
 Runtime state is stored under `runtime/`. The source warehouse remains
 read-only. Logs must not contain API keys, raw event tables, full user cohorts,

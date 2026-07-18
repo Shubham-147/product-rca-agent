@@ -7,8 +7,8 @@ from pydantic import ValidationError
 from src.analytics import DeterministicAnalytics
 from src.config import AppSettings,get_settings
 from src.database import DuckDBManager,get_duckdb_manager
-from src.guardrails import build_prompt_context,require_resolved_event
-from src.observability import get_logger
+from src.guardrails import SafeAuditLogger,build_prompt_context,require_resolved_event
+from src.observability import get_logger,log_retrieved_chunks,write_daily_openai_payload
 from src.retrieval import CanonicalEventResolver,HybridRetriever
 from src.schemas import AnalysisRequest,RCAReport,RunMetadata,RunStatus
 from src.systems.bootstrap import load_runtime_assets
@@ -22,13 +22,17 @@ class StructuredLLM(Protocol):
     def complete(self,prompt:str,output_type:type[RCAReport],*,temperature:float)->Any:...
 
 class OpenAIStructuredLLM:
-    def __init__(self,model:str,api_key:str|None=None):self.model=model;self.api_key=api_key;self._client=None
+    def __init__(self,model:str,api_key:str|None=None):self.model=model;self.api_key=api_key;self._client=None;self._call_count=0
     def complete(self,prompt,output_type,*,temperature):
         if self._client is None:
             from openai import OpenAI
             self._client=OpenAI(api_key=self.api_key)
-        response=self._client.chat.completions.create(model=self.model,temperature=temperature,
-            messages=[{"role":"user","content":prompt}],response_format={"type":"json_object"})
+        self._call_count+=1
+        request={"model":self.model,"temperature":temperature,"messages":[{"role":"user","content":prompt}],
+          "response_format":{"type":"json_object"}}
+        write_daily_openai_payload(system_name="system_a",stage=f"structured_call_{self._call_count}",
+          model=self.model,payload=request)
+        response=self._client.chat.completions.create(**request)
         return json.loads(response.choices[0].message.content)
 
 class SystemAPipeline:
@@ -58,6 +62,8 @@ class SystemAPipeline:
                                          max_chars=self.settings.max_chunk_characters)
             metadata=RunMetadata(run_id=run_id,system_name="system_a",instance_id=request.instance_id,start_time=started)
             prompt=build_prompt(request,pack,context,metadata)
+            log_retrieved_chunks(SafeAuditLogger(self.logger),system_name="system_a",
+              stage="analytical_call",chunks=chunks)
             llm_started=time.perf_counter()
             report=self._structured_call(prompt)
             llm_latency_ms=(time.perf_counter()-llm_started)*1000

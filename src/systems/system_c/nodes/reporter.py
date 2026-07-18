@@ -16,8 +16,9 @@ class ReporterNode(Node):
               resolved_events=item.hypothesis.required_events,evidence=item.evidence,confounders=item.confounders,
               confidence=min(1,max(0,item.rank_score)),limitations=[*item.limitations,
                 f"Materialized cohort reference: {materialized.query_id}"]))
+        warnings=list(dict.fromkeys(state.get("warnings",[])))
         now=datetime.now(timezone.utc);report=RCAReport(instance_id=request.instance_id,symptom=request.symptom,hypotheses=hypotheses,
-          unresolved_questions=list(state.get("warnings",[])),run_metadata=RunMetadata(run_id=self.deps.run_id,system_name="system_c",instance_id=request.instance_id,start_time=now,completion_time=now,status=RunStatus.COMPLETED))
+          unresolved_questions=warnings,run_metadata=RunMetadata(run_id=self.deps.run_id,system_name="system_c",instance_id=request.instance_id,start_time=now,completion_time=now,status=RunStatus.COMPLETED))
         validate_report(report,query_ids=set(self.deps.known_query_results),source_chunk_ids=self.deps.known_chunk_ids,
           event_resolutions=state.get("resolved_events",{}),max_hypotheses=self.deps.settings.max_hypotheses)
         return {**state,"report":report,"ranked_hypotheses":materialized_items}

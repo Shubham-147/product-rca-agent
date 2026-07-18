@@ -10,6 +10,7 @@ from src.analytics import DeterministicAnalytics
 from src.config import AppSettings,get_settings
 from src.database import DuckDBManager
 from src.guardrails import SafeAuditLogger
+from src.observability import write_daily_openai_payload
 from src.retrieval import CanonicalEventResolver
 from src.schemas import AnalysisRequest,RCAReport,RunMetadata,RunStatus
 from src.systems.bootstrap import load_runtime_assets
@@ -18,7 +19,7 @@ from src.systems.cli import add_request_arguments,analysis_request_from_args
 from .budgets import build_tool_guard
 from .dependencies import QueryCache,SystemBDependencies
 from .instructions import SYSTEM_B_INSTRUCTIONS
-from .output_validator import draft_evidence_errors,validate_system_b_output
+from .output_validator import validate_system_b_output
 from .tools import *
 
 
@@ -60,30 +61,12 @@ class PydanticAIRunner:
           ("compare_exposed_unexposed",ExposedControlInput,"compare_exposed_unexposed"),
           ("test_confounder",ConfounderTestInput,"test_confounder"),("materialize_cohort",MaterializeCohortInput,"materialize_cohort")]
         for item in registrations:register(*item)
-        @agent.output_validator
-        async def require_resolved_report_events(ctx:RunContext[SystemBDependencies],report:RCAReport):
-            missing=_unresolved_report_events(report,ctx.deps)
-            if missing:
-                raise ModelRetry(
-                    "The draft report lists canonical events that have not been successfully "
-                    f"resolved in this run: {missing}. Call resolve_events for each event, use "
-                    "the returned canonical_event exactly, then return the corrected report. "
-                    "Do not present a low-confidence or unresolved event as certain."
-                )
-            evidence_errors=draft_evidence_errors(report,ctx.deps)
-            if evidence_errors:
-                raise ModelRetry(
-                    "The draft report's numerical evidence does not exactly match the stored "
-                    f"aggregate tool results: {evidence_errors}. Correct observed_value and "
-                    "sample_size using exact fields returned by the cited query_id. Do not "
-                    "calculate, estimate, convert a rate to a percentage, or invent a value. "
-                    "If a query returned no rows, do not use it as numerical evidence. If no "
-                    "supported hypothesis remains, return hypotheses=[] and explain the missing "
-                    "evidence in unresolved_questions instead of repeating an invalid claim."
-                )
-            return report
         self._agent=agent;return agent
-    def run_sync(self,prompt,*,deps):return self._build().run_sync(prompt,deps=deps)
+    def run_sync(self,prompt,*,deps):
+        write_daily_openai_payload(system_name="system_b",stage="agent_initial_request",model=self.model,
+          payload={"instructions":SYSTEM_B_INSTRUCTIONS,"prompt":prompt,
+            "tools":list(self._build()._function_toolset.tools)})
+        return self._build().run_sync(prompt,deps=deps)
 
 
 class SystemBAgent:

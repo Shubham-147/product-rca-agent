@@ -228,3 +228,4 @@ data/TASK.md
 # scratch / editor
 .vscode/
 scratchpad/
+/log/*.txt

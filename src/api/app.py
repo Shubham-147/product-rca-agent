@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from src.config import get_settings
 from src.observability import get_logger
+import logging
 from .dependencies import PipelineRunner,SystemName,get_pipeline_runner
 from .models import *
 
@@ -18,6 +19,8 @@ REPORT_EXAMPLE={"instance_id":"inst_003","symptom":REQUEST_EXAMPLE["symptom"],"h
 ANALYSIS_EXAMPLE={"system":"system_a","instance_id":"inst_003","status":"completed","duration_ms":1250,"result":REPORT_EXAMPLE}
 app=FastAPI(title="Product RCA Agent API",version="1.0.0",docs_url="/docs",redoc_url="/redoc")
 logger=get_logger(__name__)
+logging.getLogger("src").setLevel(get_settings().logging_level)
+logging.getLogger("product_rca").setLevel(get_settings().logging_level)
 app.add_middleware(CORSMiddleware,allow_origins=get_settings().api_cors_origins,allow_credentials=True,
   allow_methods=["GET","POST"],allow_headers=["Content-Type"])
 

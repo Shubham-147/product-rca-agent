@@ -1,9 +1,33 @@
 """Bounded prompt context containing textual chunks and aggregate evidence only."""
 from __future__ import annotations
+import re
 from typing import Any
 from pydantic import BaseModel,ConfigDict,Field
 from src.retrieval.schemas import Chunk
 from .errors import GuardrailError
+
+_EXECUTABLE_INPUT_PATTERNS=(
+    r"```", r"<\s*/?\s*script\b", r"\bjavascript\s*:",
+    r"\bconsole\s*\.\s*(?:log|error|warn|debug)\s*\(",
+    r"\b(?:eval|exec|compile)\s*\(",
+    r"\b(?:os\s*\.\s*system|subprocess\s*\.|child_process\s*\.|process\s*\.\s*env|document\s*\.\s*cookie)\b",
+    r"\b(?:fetch|require|xmlhttprequest)\s*\(",
+    r"(?:^|[\s;&|])(?:bash|sh|zsh|powershell|cmd\.exe|curl|wget)\s+",
+    r"\$\(",
+)
+_PROMPT_INJECTION_PATTERNS=(
+    r"\bignore\s+(?:all\s+|any\s+|the\s+)?(?:previous|prior|above)\s+(?:instructions?|prompts?|messages?)\b",
+    r"\bdisregard\s+(?:all\s+|any\s+|the\s+)?(?:previous|prior|above)?\s*(?:instructions?|prompts?|rules?)\b",
+    r"\b(?:reveal|print|show|return)\s+(?:the\s+)?(?:system|developer)\s+(?:prompt|message|instructions?)\b",
+    r"\b(?:jailbreak|prompt\s+injection)\b",
+)
+
+def validate_analysis_text(value:str)->str:
+    """Reject executable or instruction-override content in user analysis fields."""
+    normalized=value.strip()
+    if any(re.search(pattern,normalized,re.IGNORECASE) for pattern in (*_EXECUTABLE_INPUT_PATTERNS,*_PROMPT_INJECTION_PATTERNS)):
+        raise GuardrailError("analysis text contains executable code or instruction-override content")
+    return normalized
 
 class PromptContext(BaseModel):
     model_config=ConfigDict(extra="forbid")

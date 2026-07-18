@@ -11,6 +11,7 @@ from src.analytics import DeterministicAnalytics
 from src.config import AppSettings,get_settings
 from src.database import DuckDBManager
 from src.guardrails import SafeAuditLogger,SystemCGraphGuard
+from src.observability import write_daily_openai_payload
 from src.retrieval import CanonicalEventResolver
 from src.schemas import AnalysisRequest,RCAReport
 from src.systems.bootstrap import load_runtime_assets
@@ -30,7 +31,10 @@ class OpenAIStructuredModel:
             self._client=OpenAI(api_key=self.api_key)
         prompt="Return only a JSON object matching the supplied JSON schema. "+json.dumps(
           {"task":task,"input":payload,"schema":output_type.model_json_schema()})
-        response=self._client.chat.completions.create(model=self.model,temperature=.1,messages=[{"role":"user","content":prompt}],response_format={"type":"json_object"})
+        request={"model":self.model,"temperature":.1,"messages":[{"role":"user","content":prompt}],
+          "response_format":{"type":"json_object"}}
+        write_daily_openai_payload(system_name="system_c",stage=task,model=self.model,payload=request)
+        response=self._client.chat.completions.create(**request)
         return output_type.model_validate_json(response.choices[0].message.content)
 
 def build_graph(deps:SystemCDependencies):

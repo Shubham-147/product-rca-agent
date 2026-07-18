@@ -1,4 +1,5 @@
 from src.guardrails import BLOCKED_PATTERNS,GuardrailError
+from src.observability import log_retrieved_chunks
 from src.retrieval import RetrievalMode
 from .common import Node
 class ContextRetrieverNode(Node):
@@ -19,4 +20,6 @@ class ContextRetrieverNode(Node):
                 if len(chunks)>=self.deps.settings.max_prompt_chunks:break
             if len(chunks)>=self.deps.settings.max_prompt_chunks:break
         self.deps.known_chunk_ids.update(seen)
+        log_retrieved_chunks(self.deps.logger,system_name="system_c",
+          stage="hypothesis_context",chunks=chunks)
         return {**state,"retrieved_context":chunks,"context_retry_used":bool(state.get("current_hypothesis")) or state.get("context_retry_used",False)}

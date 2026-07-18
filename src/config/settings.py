@@ -56,7 +56,9 @@ class AppSettings(BaseSettings):
     system_b_max_retrieval_calls: int = Field(default=4, ge=0, le=4)
     system_b_max_analytical_calls: int = Field(default=10, ge=0, le=10)
     system_c_max_revisions: int = Field(default=2, ge=0, le=2)
-    system_c_max_node_executions: int = Field(default=30, ge=1)
+    # Three candidates with up to two revisions each require as many as 60
+    # guarded executions including intake, ranking, and reporting.
+    system_c_max_node_executions: int = Field(default=60, ge=1)
     tool_timeout_seconds: float = Field(default=30, gt=0)
     node_timeout_seconds: float = Field(default=60, gt=0)
     max_hypotheses: int = Field(default=5, ge=1)
