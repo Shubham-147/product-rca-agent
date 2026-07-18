@@ -216,3 +216,15 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# --- Product RCA benchmark (simulator/eval) ---
+# Generated instances are large and fully reproducible from seeds — never commit.
+data/warehouses/
+data/ground_truth/
+data/tasks/
+data/corpus/
+data/TASK.md
+*.duckdb
+# scratch / editor
+.vscode/
+scratchpad/
