@@ -5,6 +5,28 @@
 
 ---
 
+## 0. Mockups (designed in Paper)
+
+Static high-fidelity mockups. These are visual references for the build, not code.
+
+**The Investigation Workbench** — one System-C run on `inst_001`: the funnel symptom,
+the live agent trace (tool calls streaming, the LangGraph node pipeline with the
+Falsifier back-edge), the Inspector (SQL result + RAG event-resolution), and the
+verified root-cause card scored against ground truth.
+
+![Investigation Workbench](design/workbench-system-c.png)
+
+**System Comparison (A · B · C)** — how each architecture runs the same case, the
+full metrics matrix, the headline gaps, and the per-case correctness grid (B fails
+exactly the confounder/Simpson cases; C survives them).
+
+![A/B/C Comparison](design/comparison-a-b-c.png)
+
+> Metric values in the mockups are **illustrative** — they encode the expected
+> story until the real A/B/C agents run through `eval/run_case`.
+
+---
+
 ## 1. What this UI is (and what it is for)
 
 Two audiences, one product:
