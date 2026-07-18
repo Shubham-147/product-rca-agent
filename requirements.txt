@@ -1,5 +1,16 @@
 # Product RCA — simulator + eval harness dependencies
 duckdb>=1.0
 pydantic>=2.0
+pydantic-settings>=2.0
 numpy>=1.26
 pandas>=2.0
+chromadb>=0.6
+# Chroma 0.6.x calls the pre-6 positional capture API even when telemetry is disabled.
+posthog<6
+rank-bm25>=0.2
+sentence-transformers>=3.0
+openai>=1.0
+pydantic-ai>=0.8
+langgraph>=0.6
+fastapi>=0.115
+uvicorn>=0.30
