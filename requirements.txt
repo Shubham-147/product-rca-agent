@@ -1,0 +1,5 @@
+# Product RCA — simulator + eval harness dependencies
+duckdb>=1.0
+pydantic>=2.0
+numpy>=1.26
+pandas>=2.0
