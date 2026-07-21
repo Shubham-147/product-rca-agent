@@ -74,6 +74,8 @@ def score(resolver: Resolver, gold: dict[str, str], alignment: dict[str, str], s
     for name, gold_canon in gold.items():
         res = resolver.resolve(name, leave_one_out=True)
         pred_canon = alignment.get(res.concept_id, UNKNOWN) if res.resolved else UNKNOWN
+        # candidates re-expressed in gold-canonical terms for readability
+        cands = [(alignment.get(cid, cid), s) for cid, s in res.candidates]
         records.append(
             {
                 "name": name,
@@ -84,9 +86,43 @@ def score(resolver: Resolver, gold: dict[str, str], alignment: dict[str, str], s
                 "correct": res.resolved and pred_canon == gold_canon,
                 "committed": res.resolved,
                 "slice": "seen" if name in seen else "unseen",
+                "candidates": cands,
             }
         )
     return records
+
+
+def dump_per_query(records, csv_path: Path | None = None):
+    """Print every query -> resolution, grouped by gold concept, misses flagged."""
+    def fmt_cands(cs):
+        return ", ".join(f"{c}:{s:.3f}" for c, s in cs[:3])
+
+    by_gold: dict[str, list] = defaultdict(list)
+    for r in records:
+        by_gold[r["gold"]].append(r)
+
+    print("\nPER-QUERY RESOLUTIONS  (weighted hybrid, leave-one-out; ✗ = miss, [u]=unseen)")
+    for gold_canon in sorted(by_gold):
+        rows = sorted(by_gold[gold_canon], key=lambda r: (r["correct"], r["name"]))
+        n_wrong = sum(not r["correct"] for r in rows)
+        head = f"\n▸ {gold_canon}   ({len(rows)} names" + (f", {n_wrong} miss" if n_wrong else "") + ")"
+        print(head)
+        for r in rows:
+            mark = "  " if r["correct"] else "✗ "
+            sl = "[u]" if r["slice"] == "unseen" else "   "
+            arrow = f"-> {r['pred']}" if r["correct"] else f"-> {r['pred']}   (top: {fmt_cands(r['candidates'])})"
+            print(f"   {mark}{sl} {r['name']:26s} {arrow}")
+
+    if csv_path:
+        lines = ["name,gold,pred,correct,slice,confidence,top3"]
+        for r in records:
+            top3 = " | ".join(f"{c}:{s:.3f}" for c, s in r["candidates"][:3])
+            lines.append(
+                f'{r["name"]},{r["gold"]},{r["pred"]},{int(r["correct"])},'
+                f'{r["slice"]},{r["confidence"]:.3f},"{top3}"'
+            )
+        csv_path.write_text("\n".join(lines) + "\n")
+        print(f"\nfull table written to {csv_path}")
 
 
 def micro_prf(records) -> dict[str, float]:
@@ -130,7 +166,11 @@ def build_resolver(index, signal_names, min_raw, dense_signal=None, weights=None
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dense", action="store_true", help="include the bge-small dense signal")
+    ap.add_argument("--per-query", action="store_true",
+                    help="dump every query->resolution for the best variant (implies --dense)")
     args = ap.parse_args()
+    if args.per_query:
+        args.dense = True
 
     gold = load_gold()
     seen = taxonomy_names()
@@ -147,18 +187,22 @@ def main():
     print()
 
     dense_signal = None
-    # (label, signal_names, weights) — weights let a reliable signal outvote weaker ones.
+    # (label, signal_names, weights) — weights are ALWAYS explicit so the table is
+    # honest regardless of the resolver's production defaults. Single-signal rows use
+    # equal weight (irrelevant); the "equal" hybrids use {1,1,..} to expose the
+    # naive-RRF-underperforms finding vs the tuned weighting.
+    EQ = {"charngram": 1.0, "fuzzy": 1.0, "dense": 1.0}
     variants = [
-        ("charngram", ["charngram"], None),
-        ("fuzzy", ["fuzzy"], None),
-        ("charngram+fuzzy", ["charngram", "fuzzy"], None),
+        ("charngram", ["charngram"], EQ),
+        ("fuzzy", ["fuzzy"], EQ),
+        ("charngram+fuzzy (equal)", ["charngram", "fuzzy"], EQ),
     ]
     if args.dense:
         from agent.retrieval.dense import DenseSignal
         dense_signal = DenseSignal(index)
         variants += [
-            ("dense", ["dense"], None),
-            ("cng+fz+dn (equal)", ["charngram", "fuzzy", "dense"], None),
+            ("dense", ["dense"], EQ),
+            ("cng+fz+dn (equal)", ["charngram", "fuzzy", "dense"], EQ),
             ("cng+fz+dn (fuzzy 2x)", ["charngram", "fuzzy", "dense"],
              {"fuzzy": 2.0, "charngram": 1.0, "dense": 1.0}),
             ("cng+fz+dn (fz3 cng2 dn1)", ["charngram", "fuzzy", "dense"],
@@ -201,6 +245,9 @@ def main():
                            weights=best_weights)
         m = micro_prf(score(r, gold, alignment, seen))
         print(f"  {thr:5.2f} {m['P']:7.3f} {m['R']:7.3f} {m['F1']:7.3f} {m['coverage']:7.3f}")
+
+    if args.per_query:
+        dump_per_query(recs, csv_path=REPO_ROOT / "eval" / "retrieval_resolutions.csv")
 
 
 if __name__ == "__main__":
