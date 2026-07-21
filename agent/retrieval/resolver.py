@@ -71,6 +71,15 @@ class Resolver:
 
     def resolve(self, query: str, leave_one_out: bool = False, top_n: int = 5) -> Resolution:
         exclude = self.index.exclude_for(query) if leave_one_out else set()
+
+        # Exact normalized-string match is a certainty — honour it over rank fusion,
+        # which (being rank-only) can let a strong fuzzy exact-match lose to a decoy
+        # that two weaker signals both rank highly. Only when it's unambiguous.
+        exact = self.index.exact_concepts(query, exclude)
+        if len(exact) == 1:
+            cid = next(iter(exact))
+            return Resolution(query, cid, 1.0, [(cid, 1.0)])
+
         rankings = {s.name: s.rank(query, exclude) for s in self.signals}
         fused = rrf(rankings, self.weights, self.rrf_k)
 

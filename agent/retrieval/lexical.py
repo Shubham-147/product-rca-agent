@@ -43,17 +43,30 @@ class AnchorIndex:
         self.anchors: list[str] = []
         self.anchor_concept: list[str] = []
         self.concept_anchor_idx: dict[str, list[int]] = {}
+        self._exact: dict[str, list[int]] = {}  # normalized form -> anchor indices
         for c in concepts:
             for a in c.aliases:
                 if is_placeholder_name(a):
                     continue
-                self.concept_anchor_idx.setdefault(c.concept_id, []).append(len(self.anchors))
+                i = len(self.anchors)
+                self.concept_anchor_idx.setdefault(c.concept_id, []).append(i)
+                self._exact.setdefault(normalize(a), []).append(i)
                 self.anchors.append(a)
                 self.anchor_concept.append(c.concept_id)
 
     def exclude_for(self, query: str) -> set[int]:
         """Anchor indices whose surface string equals the query (leave-one-out mask)."""
         return {i for i, a in enumerate(self.anchors) if a == query}
+
+    def exact_concepts(self, query: str, exclude: set[int] | None = None) -> set[str]:
+        """Concepts owning an anchor whose *normalized* form equals the query's.
+
+        An exact normalized match (`sssn_strt` ~ anchor `sssn_strt`) is a lexical
+        certainty; the resolver honours it over rank fusion. Excluded anchors
+        (leave-one-out) don't count, so this never leaks a masked self-match."""
+        exclude = exclude or set()
+        idxs = [i for i in self._exact.get(normalize(query), []) if i not in exclude]
+        return {self.anchor_concept[i] for i in idxs}
 
 
 class Signal(ABC):

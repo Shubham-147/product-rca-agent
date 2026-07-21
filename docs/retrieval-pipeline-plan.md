@@ -170,9 +170,18 @@ pipeline**; the harness is the only thing that reads `event_canonical_map.json`.
 | charngram | 0.884 | 0.879 | 0.892 | 0.833 |
 | fuzzy | 0.907 | 0.913 | 0.913 | 0.867 |
 | charngram+fuzzy (equal) | 0.889 | 0.888 | 0.908 | 0.767 |
-| dense (bge-small) | 0.809 | 0.805 | 0.800 | 0.867 |
+| dense (bge-small) | 0.862 | 0.863 | 0.862 | 0.867 |
 | cng+fz+dn (equal RRF) | 0.898 | 0.902 | 0.897 | 0.900 |
 | **cng+fz+dn (fuzzy 3× cng 2× dn 1×)** | **0.911** | **0.912** | **0.908** | **0.933** |
+
+**Exact-match short-circuit (added when wiring retrieval into analytics):** RRF fuses by
+*rank*, not score, so a signal's *perfect* exact match can lose to a decoy that two
+weaker signals both rank highly (found live: `sssn_strt`→app_open lost to
+`checkout_start` because `strt`≈`start`, polluting a warehouse funnel). Fix: when a
+query's *normalized* form exactly matches an anchor of exactly one concept, resolve to
+it and skip fusion — a lexical certainty. Leak-safe under leave-one-out (the masked
+self-anchor doesn't count). Effect: dense-alone 0.809→0.862; weighted hybrid unchanged
+at 0.911; runtime known-alias resolution now deterministic.
 
 **Findings (measured, not asserted):**
 1. **Lexical fuzzy alone already clears the 0.85 gate** (0.907) — leave-one-out still
