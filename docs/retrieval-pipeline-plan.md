@@ -142,3 +142,67 @@ isolation (with an honest ablation) de-risks the agent and gives us the design-d
 - **Abstain threshold** for `unknown` — tune on the offline harness (precision vs
   coverage).
 - **Index artifacts:** git-ignore + rebuild (my default) vs commit for zero-setup repro.
+
+---
+
+## 8. RESULTS — Phase 1a built & measured (2026-07-22)
+
+Built `agent/retrieval/` (`concepts`, `normalize`, `lexical`, `dense`, `fuse`,
+`resolver`) + `eval/run_retrieval.py`. All corpus-derived, **no gold read by the
+pipeline**; the harness is the only thing that reads `event_canonical_map.json`.
+
+**How it's scored (honest by construction):**
+- **44 concepts discovered from the taxonomy's 44 distinct `description` groups** — no
+  gold. Concept→gold-canonical *alignment* (majority vote over firing aliases) is done
+  by the scorer only: **44/44 concepts aligned, 44/44 gold canonicals covered, zero
+  over-split collisions** — the vocabulary is exactly right.
+- **Leave-one-out**: to resolve a name that is itself a known alias, that anchor is
+  masked, so every one of the 225 firing names is a genuine retrieval, not a lookup.
+- **Slices:** seen-in-taxonomy (195) vs **unseen (30)** — the true generalization set.
+- **Dead-placeholder poison fixed:** 6 never-firing names (`beta_checkout_v1`,
+  `test_event_do_not_use`, …) whose surface strings *lie* about their concept are
+  excluded as lexical anchors (they are never queries either).
+
+**Ablation (leave-one-out, forced top-1 — pure ranking power):**
+
+| signals | micro-F1 | macro-F1 | seen | unseen |
+| :-- | --: | --: | --: | --: |
+| charngram | 0.884 | 0.879 | 0.892 | 0.833 |
+| fuzzy | 0.907 | 0.913 | 0.913 | 0.867 |
+| charngram+fuzzy (equal) | 0.889 | 0.888 | 0.908 | 0.767 |
+| dense (bge-small) | 0.809 | 0.805 | 0.800 | 0.867 |
+| cng+fz+dn (equal RRF) | 0.898 | 0.902 | 0.897 | 0.900 |
+| **cng+fz+dn (fuzzy 3× cng 2× dn 1×)** | **0.911** | **0.912** | **0.908** | **0.933** |
+
+**Findings (measured, not asserted):**
+1. **Lexical fuzzy alone already clears the 0.85 gate** (0.907) — leave-one-out still
+   leaves ~4 sibling aliases per concept, and edit/token similarity to the cleanest
+   sibling usually lands.
+2. **Naive equal-weight RRF *underperforms* the best single signal** (hybrid 0.898 <
+   fuzzy 0.907): democratic voting lets two weaker signals overrule near-perfect fuzzy
+   on easy cases. *Fusion weighting matters, not just fusion.*
+3. **Weighted hybrid is the winner and the design-doc thesis, earned:** 0.911 overall
+   and **0.933 on the unseen slice** (vs fuzzy 0.867). **Dense's value is specifically
+   generalization** — it can't see through vowel-dropped abbreviations (`chckt`,
+   `psh_rcvd`) but recovers real-word/camelCase unseen names (`BeginCheckout`,
+   `ProductPage`, `cartView`) that lexical ranks below a same-suffix decoy.
+4. **No cross-encoder needed** (D2 stays deferred). Residual ~20 misses are genuine
+   near-synonym pairs (`review_submit`↔`review_view`, `tutorial_view`↔`tutorial_skip`).
+
+**Operating point (abstention curve, weighted hybrid):**
+
+| min_raw | P | R | F1 | coverage |
+| --: | --: | --: | --: | --: |
+| 0.30 | 0.911 | 0.911 | 0.911 | 1.000 |
+| 0.60 | 0.927 | 0.907 | 0.917 | 0.978 |
+| **0.70** | **0.953** | **0.907** | **0.929** | **0.951** |
+| 0.80 | 0.966 | 0.880 | 0.921 | 0.911 |
+
+Default weights `{fuzzy:3, charngram:2, dense:1}`, `min_raw=0.30`, frozen in
+`resolver.py`. **Gate PASSED.** Retrieval is measured-and-good; the agent can stand
+on it.
+
+**Deferred to the agent-wiring step (Phase 1a.3):** `build.py`/`query.py` runtime
+singleton (the build is <2 s, so an in-memory cached resolver replaces heavy Chroma
+persistence — a measure-first simplification), the `resolve_events` tool wrapper, and
+`retrieve_spec` (dense-over-PRD, lower stakes, not P/R-gated).
