@@ -6,9 +6,10 @@ attribution top-1, cohort-F1, decoy false-positive rate, fault detection — plu
 cost/latency per case (tenet #6). Writes a JSON run manifest for diffing across runs.
 
 Usage:
-  ../.venv/bin/python -m eval.run_suite                 # all instances, System B
-  ../.venv/bin/python -m eval.run_suite --limit 5       # first 5 (cheap iteration)
-  ../.venv/bin/python -m eval.run_suite --workers 4     # parallel LLM calls
+  ../.venv/bin/python -m eval.run_suite --system B                 # System B
+  ../.venv/bin/python -m eval.run_suite --system A --limit 5       # System A, first 5
+  ../.venv/bin/python -m eval.run_suite --system A --workers 4     # parallel cases
+  ../.venv/bin/python -m eval.run_suite --system C --limit 5       # LangGraph + falsifier
 """
 
 from __future__ import annotations
@@ -29,6 +30,7 @@ RESULTS_DIR = REPO_ROOT / "eval" / "results"
 PRICES = {
     "openai/gpt-4o-mini": (0.15, 0.60), "gpt-4o-mini": (0.15, 0.60),
     "openai/gpt-4o": (2.50, 10.0), "gpt-4o": (2.50, 10.0),
+    "gpt-5.4-mini": (0.75, 4.50),
 }
 
 
@@ -105,14 +107,18 @@ def aggregate(rows: list[dict], model: str) -> dict:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
+    ap.add_argument("--system", choices=("A", "B", "C"), default="B")
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--workers", type=int, default=1)
     ap.add_argument("--resume", action="store_true", help="skip instances already in the results file")
     args = ap.parse_args()
 
+    from agent.systems.system_a import SystemA
     from agent.systems.system_b import SystemB
+    from agent.systems.system_c import SystemC
     from agent.config import get_settings
-    system = SystemB()
+    systems = {"A": SystemA, "B": SystemB, "C": SystemC}
+    system = systems[args.system]()
     model = get_settings().model_name
     RESULTS_DIR.mkdir(exist_ok=True)
     out = RESULTS_DIR / f"suite_system_{system.name}.json"

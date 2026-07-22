@@ -12,3 +12,10 @@ fastembed>=0.3      # local bge-small ONNX embeddings (no torch)
 # Agent (System B) — ReAct over the tool layer
 pydantic-ai-slim[openai]>=2.14   # typed tool-calling agent + OpenAI/LiteLLM client
 pydantic-settings>=2.0           # env-driven config
+
+# System C — cyclic investigator/falsifier orchestration
+langgraph>=0.2
+
+# Comparison API
+fastapi>=0.115
+uvicorn>=0.30
