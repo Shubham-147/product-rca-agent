@@ -75,9 +75,28 @@ curl http://127.0.0.1:8000/comparison
 
 The endpoint returns aggregate metrics followed by case-aligned A/B/C predictions.
 For a UI on another origin, set `COMPARISON_UI_ORIGINS` to a comma-separated allowlist;
-localhost ports 3000 and 5173 are allowed by default.
+localhost and `127.0.0.1` ports 3000 and 5173 are allowed by default.
 See [docs/comparison-api.md](docs/comparison-api.md) for the response contract and
 failure behavior.
+
+## React workbench
+
+The `frontend/` Vite application recreates the three-column investigation workbench
+using live data from `GET /comparison`: case library, system comparison, per-case A/B/C
+results, scorer verdicts, and run telemetry.
+
+```bash
+# Terminal 1
+.venv/bin/uvicorn api.app:app --host 127.0.0.1 --port 8000
+
+# Terminal 2
+cd frontend
+npm install
+npm run dev
+```
+
+Open `http://127.0.0.1:5173`. See [frontend/README.md](frontend/README.md) for API URL
+configuration.
 
 The corresponding manifests are `eval/results/suite_system_<A|B|C>.json`; readable
 traces are written below `eval/traces/`. See [docs/system-a.md](docs/system-a.md) for

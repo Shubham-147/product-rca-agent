@@ -69,5 +69,5 @@ It returns `503` when a manifest is missing, `500` when JSON/schema structure is
 invalid, and `409` when the systems do not contain the same cases. It never invokes a
 model or modifies the manifests.
 
-The default CORS allowlist is `http://localhost:3000,http://localhost:5173`. Override
-it with the comma-separated `COMPARISON_UI_ORIGINS` environment variable.
+The default CORS allowlist includes both `localhost` and `127.0.0.1` on ports 3000 and
+5173. Override it with the comma-separated `COMPARISON_UI_ORIGINS` environment variable.

@@ -124,7 +124,9 @@ app = FastAPI(
     openapi_url=None,
 )
 origins = [item.strip() for item in os.environ.get(
-    "COMPARISON_UI_ORIGINS", "http://localhost:3000,http://localhost:5173"
+    "COMPARISON_UI_ORIGINS",
+    ("http://localhost:3000,http://localhost:5173,"
+     "http://127.0.0.1:3000,http://127.0.0.1:5173"),
 ).split(",") if item.strip()]
 app.add_middleware(
     CORSMiddleware,
