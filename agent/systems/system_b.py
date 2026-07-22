@@ -64,6 +64,15 @@ def build_agent(model=None) -> Agent[Deps, list[AgentHypothesis]]:
         retries=2,  # output-repair: refeed a validation error before failing the run
     )
 
+    @agent.instructions
+    def cohort_domains(ctx: RunContext[Deps]) -> str:
+        """Inject the instance's real attribute values so the agent builds cohorts from
+        actual data, not guesses (the run-1 failure: os='iOS' matched 0 users)."""
+        d = ctx.deps.analytics.attribute_domains()
+        lines = [f"  {k}: {v}" for k, v in d.items()]
+        return ("VALID COHORT ATTRIBUTE VALUES for this instance — use these EXACT "
+                "values; a cohort matching 0 users is wrong:\n" + "\n".join(lines))
+
     @agent.tool
     def funnel(ctx: RunContext[Deps], segment_by: list[str] | None = None):
         """Session-level conversion for each funnel step, baseline vs recent, with

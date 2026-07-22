@@ -92,7 +92,11 @@ def cohort_resolve(deps: Deps, cohort: Cohort) -> CohortResult | ToolError:
     except Exception as e:  # fail typed (tenet #7)
         return ToolError(error=str(e),
                          hint="check op/value coherence (op 'in' needs a list; others a scalar)")
-    return CohortResult(predicate=res.predicate, n_users=res.n_users)
+    note = ""
+    if res.n_users == 0:
+        note = ("matched 0 users — an attribute value is likely wrong; check it against "
+                "the valid domain listed in your instructions (e.g. os='iOS 17', not 'iOS').")
+    return CohortResult(predicate=res.predicate, n_users=res.n_users, note=note)
 
 
 def resolve_events(query: str, k: int = 8) -> EventResolution | ToolError:

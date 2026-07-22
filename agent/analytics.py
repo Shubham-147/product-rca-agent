@@ -77,6 +77,26 @@ def _check_segment_cols(cols: list[str]) -> None:
 class Analytics:
     def __init__(self, wh: Warehouse):
         self.wh = wh
+        self._domains: dict | None = None
+
+    # ------------------------------------------------------------ attribute_domains
+    def attribute_domains(self) -> dict:
+        """The valid values of each cohort attribute (schema domain, not the answer).
+
+        Low-cardinality columns list their distinct values; device_age_months (numeric)
+        gives its range. Lets the agent build cohorts from REAL values instead of
+        guessing (e.g. 'iOS 17' not 'iOS'). Legitimately agent-visible — a real analyst
+        would `SELECT DISTINCT`. Memoized (small queries over the users table)."""
+        if self._domains is None:
+            out: dict[str, object] = {}
+            for c in ("os", "device_type", "geo", "channel", "is_returning"):
+                out[c] = [r[0] for r in self.wh.query(
+                    f"SELECT DISTINCT {c} FROM w.users ORDER BY 1")]
+            lo, hi = self.wh.query(
+                "SELECT min(device_age_months), max(device_age_months) FROM w.users")[0]
+            out["device_age_months"] = {"min": int(lo), "max": int(hi)}
+            self._domains = out
+        return self._domains
 
     # ---------------------------------------------------------------- funnel
     def funnel(self, segment_by: list[str] | None = None) -> list[StepConversion]:

@@ -52,6 +52,7 @@ class MetricResult(BaseModel):
 class CohortResult(BaseModel):
     predicate: str
     n_users: int
+    note: str = ""  # set when the cohort matches 0 users (likely a wrong attribute value)
 
 
 class EventCandidate(BaseModel):
