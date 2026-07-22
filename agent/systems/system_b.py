@@ -39,6 +39,11 @@ PRD SLO — verify the SLO with `retrieve_spec`):
     checkout_start -> payment_submit  =>  checkout_latency    (checkout_p95 over SLO)
     payment_submit -> order_confirmed =>  payment_failure     (payment_error_rate up)
     crash rate elevated in a cohort   =>  crash_concentration (crash_rate up)
+  HOW TO CONFIRM cold_start / dead_screen: their signal is the STEP CONVERSION dropping
+  for a COHORT, not a latency breach. A small OVERALL step drop can still hide a large
+  cohort drop — so segment `conversion:<from>-><to>` for that step by attributes before
+  dismissing it. A flat cold_start_p95 does NOT rule out cold_start. (checkout_latency and
+  payment_failure additionally require their metric: checkout_p95 / payment_error_rate.)
   Before you may conclude `innocent_dropoff`, you MUST have checked the relevant metrics
   and found NO SLO breach and NO concentration. NEVER default to innocent when unsure —
   that is a wrong answer on a real fault. Only call innocent if the drop is at an OPTIONAL
