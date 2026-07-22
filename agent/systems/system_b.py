@@ -160,8 +160,9 @@ class SystemB:
                 "stub model (TestModel/FunctionModel) to run()."
             )
         model_settings = {
-            "temperature": self.settings.temperature,   # determinism (tenet #3)
-            "timeout": self.settings.request_timeout_s,  # no infinite network hang
+            "temperature": self.settings.temperature,      # determinism (tenet #3)
+            "timeout": self.settings.request_timeout_s,    # no infinite network hang
+            "max_tokens": self.settings.max_output_tokens,  # bound per-response cost/size
         }
         t0 = time.monotonic()
         try:

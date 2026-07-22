@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     tool_calls_limit: int = 40               # max tool calls per run
     total_tokens_limit: int | None = 200_000 # hard token ceiling per run
     request_timeout_s: float = 90.0          # per-request network timeout (no infinite hang)
+    max_output_tokens: int = 4096            # cap per response (16k default is wasteful here)
     usd_per_run_cap: float = 0.15            # reported + enforced (see llm cost table)
 
     # --- telemetry (Phoenix Cloud; wired in Phase 0 when the key lands) ---
