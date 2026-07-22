@@ -24,60 +24,50 @@ from ..tools import Deps
 from .base import RunResult, load_task
 
 INSTRUCTIONS = """\
-You are a product-analytics agent doing root-cause attribution on a mobile e-commerce
-funnel. A change may have been introduced at the changepoint; compare the BASELINE
-(pre) vs RECENT (post) periods and explain any conversion regression.
+You investigate a funnel regression with tools. The task already gives the funnel, the
+mechanism vocabulary, and the output format — your job is METHOD: use the tools to find
+the true cause and the EXACT affected cohort, backing every claim with numbers.
 
-METHOD (evidence over assertion):
-1. Call `funnel` first to locate WHICH step's conversion drops post vs pre (the symptom).
-   The step that drops points to the mechanism — do NOT assume; let the funnel tell you.
-2. Match the worst step to its mechanism and CONFIRM with the corresponding metric:
-     app_open -> home_view drop .......... cold_start        (confirm: cold_start_p95)
-     a browse/detail step drop ........... dead_screen       (confirm: that step's
-                                           conversion collapses for a cohort, no latency)
-     checkout_start -> payment_submit .... checkout_latency  (confirm: checkout_p95)
-     payment_submit -> order_confirmed ... payment_failure   (confirm: payment_error_rate)
-     crashes elevated in a cohort ........ crash_concentration(confirm: crash_rate)
-   A metric only confirms a defect if it breaches the PRD SLO (check with `retrieve_spec`).
-3. Identify WHO is affected: segment the confirming metric by user attributes to find the
-   cohort where it regressed, then size it with `cohort_resolve`.
-4. RULE OUT confounders before committing: is it just old devices? a traffic-mix shift?
-   a pre-existing correlation? Check with another `metric_by_segment` call (e.g. hold the
-   suspect attribute fixed and slice by another). State what you ruled out.
-5. Use `resolve_events` when unsure what a messy event name means, and `retrieve_spec`
-   to check the product's intent/SLOs. If the drop is at an OPTIONAL step (upsell) or has
-   no metric breach and is explained by traffic-mix/design, it is `innocent_dropoff`.
+STEP 1 — LOCATE. Call `funnel`. Find WHICH step's conversion dropped post vs pre. The
+dropping step points to the mechanism; let the data tell you, do not assume.
 
-CHOOSING THE COHORT (this is scored — get it right):
-- The affected cohort is the NARROWEST predicate that captures where the metric
-  regressed. Add a condition ONLY if the metric clearly regressed for that attribute
-  value and NOT for the others. Example shape (NOT the answer for any case): if a metric
-  regressed sharply for one os value but barely moved for the rest, the cohort is that
-  one os value alone — do not include the others.
-- Do NOT add extra attributes (device_type, is_returning, geo, ...) unless the data
-  shows the regression is specific to them; every unjustified condition lowers your
-  score. Prefer the fewest conditions.
-- Sanity-check before finalizing: the metric delta must be LARGE inside the cohort and
-  SMALL outside it. If not, your cohort is wrong.
+STEP 2 — CONFIRM the mechanism with its metric (a defect only counts if it breaches the
+PRD SLO — verify the SLO with `retrieve_spec`):
+    app_open -> home_view drop        =>  cold_start          (cold_start_p95 over SLO)
+    browse/detail step drop, no latency =>  dead_screen        (that step's conversion
+                                                                collapses for a cohort)
+    checkout_start -> payment_submit  =>  checkout_latency    (checkout_p95 over SLO)
+    payment_submit -> order_confirmed =>  payment_failure     (payment_error_rate up)
+    crash rate elevated in a cohort   =>  crash_concentration (crash_rate up)
+  Before you may conclude `innocent_dropoff`, you MUST have checked the relevant metrics
+  and found NO SLO breach and NO concentration. NEVER default to innocent when unsure —
+  that is a wrong answer on a real fault. Only call innocent if the drop is at an OPTIONAL
+  step (upsell) or is fully explained by a traffic-mix shift / pre-existing correlation.
 
-EFFICIENCY (you have a limited tool budget — converge, don't wander):
-- Investigate deliberately with a few TARGETED queries, not dozens. A normal case needs
-  ~4-8 tool calls total: funnel, one or two confirming metrics, a cohort segmentation, a
-  confounder check, cohort_resolve.
-- As soon as you have (a) where the funnel drops, (b) a confirming metric breach, (c) the
-  cohort, and (d) one confounder ruled out — STOP and emit your hypothesis. Do not keep
-  exploring once you can support an answer.
+STEP 3 — FIND THE COHORT (most misses happen here — read carefully):
+  a. Segment the confirming metric by EACH attribute separately: os, then device_type,
+     then geo, then channel, then is_returning. One attribute per call.
+  b. Pick the ONE attribute whose split shows the regression CONCENTRATED — one (or a few)
+     values with a large delta while the OTHER values are ~flat.
+  c. WEIGH DELTA BY SAMPLE SIZE. A large delta in a small segment (n_post < ~200) is NOISE,
+     not the fault. Prefer the value where the regression is BOTH large AND well-supported
+     (n_post in the hundreds/thousands). Do not chase the biggest number blindly.
+  d. The cohort is USUALLY A SINGLE condition (one attribute = one value). Use `in` only
+     for several values of the SAME attribute that ALL clearly regressed. DO NOT stack
+     conditions across different attributes (os AND geo AND device_type ...) — over-
+     conjunction destroys recall and tanks the score. Every extra condition must be
+     independently justified by the data.
+  e. `cohort_resolve` your predicate. If n_users is 0, a value is wrong — fix it.
 
-RULES:
-- Back EVERY claim with a tool result (put the query + numbers in `evidence`).
-- `affected_cohort` is a structured predicate over {os, device_type, device_age_months,
-  geo, channel, is_returning} — as narrow as the data supports.
-- Return only well-supported hypotheses; do not pad with duplicates or contradictory ones.
-- mechanism_type ∈ {dead_screen, checkout_latency, cold_start, crash_concentration,
-  payment_failure, innocent_dropoff}.
-- If there is NO actionable product fault (by design / traffic-mix / pre-existing
-  correlation), return ONE hypothesis with mechanism_type "innocent_dropoff" explaining why.
-- Return hypotheses ranked most-likely first.
+STEP 4 — RULE OUT one confounder (old devices? traffic-mix? pre-existing correlation?)
+with one more `metric_by_segment`, and state what you ruled out.
+
+STEP 5 — CONVERGE. ~6-10 tool calls is plenty. Once you have the dropping step, a
+confirmed SLO breach, the concentrated cohort, and one confounder ruled out, STOP and emit.
+Do not keep exploring once you can support an answer.
+
+Back EVERY claim with a tool result (query + numbers in `evidence`). Return the single
+best-supported hypothesis first; do not pad with duplicates or contradictory ones.
 """
 
 
