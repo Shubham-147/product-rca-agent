@@ -68,6 +68,12 @@ class CohortResolution:
     user_ids: list[str] = field(default_factory=list)
 
 
+def _native(v):
+    """Convert a numpy scalar (e.g. numpy.bool_ from an is_returning groupby key) to a
+    native Python type so tool results serialize cleanly for the model."""
+    return v.item() if hasattr(v, "item") else v
+
+
 def _check_segment_cols(cols: list[str]) -> None:
     bad = [c for c in cols if c not in COHORT_COLS]
     if bad:
@@ -116,7 +122,7 @@ class Analytics:
         rows: list[StepConversion] = []
         groups = sess.groupby(segment_by) if segment_by else [((), sess)]
         for key, sub in groups:
-            seg = dict(zip(segment_by, key if isinstance(key, tuple) else (key,))) if segment_by else {}
+            seg = {c: _native(v) for c, v in zip(segment_by, key if isinstance(key, tuple) else (key,))} if segment_by else {}
             pre, post = sub[sub.period == "pre"], sub[sub.period == "post"]
             for i in range(len(FUNNEL_STEPS) - 1):
                 a, b = f"f_{i}", f"f_{i+1}"
@@ -165,7 +171,7 @@ class Analytics:
         out: list[MetricRow] = []
         groups = sess.groupby(segment_by) if segment_by else [((), sess)]
         for key, sub in groups:
-            seg = dict(zip(segment_by, key if isinstance(key, tuple) else (key,))) if segment_by else {}
+            seg = {c: _native(v) for c, v in zip(segment_by, key if isinstance(key, tuple) else (key,))} if segment_by else {}
             pre, post = sub[sub.period == "pre"], sub[sub.period == "post"]
             out.append(MetricRow(
                 metric=f"conversion:{a}->{b}", segment=seg,
@@ -199,7 +205,7 @@ class Analytics:
         out: list[MetricRow] = []
         keys = df[segment_by].drop_duplicates().itertuples(index=False) if segment_by else [()]
         for key in keys:
-            seg = dict(zip(segment_by, key)) if segment_by else {}
+            seg = {c: _native(v) for c, v in zip(segment_by, key)} if segment_by else {}
             mask = pd.Series(True, index=df.index)
             for c, v in seg.items():
                 mask &= df[c] == v
