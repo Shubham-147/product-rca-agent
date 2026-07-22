@@ -32,13 +32,18 @@ class Settings(BaseSettings):
     max_output_tokens: int = 4096            # cap per response (16k default is wasteful here)
     usd_per_run_cap: float = 0.15            # reported + enforced (see llm cost table)
 
-    # --- telemetry (Phoenix Cloud; wired in Phase 0 when the key lands) ---
-    phoenix_api_key: str | None = None
-    otel_endpoint: str | None = None
+    # --- telemetry (Langfuse via OpenTelemetry; activates when keys are set) ---
+    langfuse_public_key: str | None = None
+    langfuse_secret_key: str | None = None
+    langfuse_host: str = "https://cloud.langfuse.com"
 
     @property
     def has_llm(self) -> bool:
         return bool(self.llm_base_url)
+
+    @property
+    def has_langfuse(self) -> bool:
+        return bool(self.langfuse_public_key and self.langfuse_secret_key)
 
 
 @lru_cache(maxsize=1)

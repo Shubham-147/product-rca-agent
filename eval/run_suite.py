@@ -27,9 +27,21 @@ RESULTS_DIR = REPO_ROOT / "eval" / "results"
 
 # Approx OpenRouter/OpenAI prices (USD per 1M tokens) for cost reporting. Update per model.
 PRICES = {
-    "openai/gpt-4o-mini": (0.15, 0.60),
-    "openai/gpt-4o": (2.50, 10.0),
+    "openai/gpt-4o-mini": (0.15, 0.60), "gpt-4o-mini": (0.15, 0.60),
+    "openai/gpt-4o": (2.50, 10.0), "gpt-4o": (2.50, 10.0),
 }
+
+
+TRACES_DIR = REPO_ROOT / "eval" / "traces"
+
+
+def _write_trace(res, iid: str) -> None:
+    """Persist the ReAct loop for this run (keyless observability)."""
+    if res.trace is None:
+        return
+    from agent.trace import write_trace
+    score = None
+    write_trace(res.trace, TRACES_DIR, hypotheses=res.hypotheses)
 
 
 def _score_one(system, task_path: Path) -> dict:
@@ -38,6 +50,7 @@ def _score_one(system, task_path: Path) -> dict:
     warehouse = str((DATA / task["warehouse"]).resolve())
     res = system.run(task_path)
     gold = load_gold(GROUND_TRUTH, iid)
+    _write_trace(res, iid)
     if res.error:
         return {"instance_id": iid, "error": res.error, "gold_fault": gold.fault_type,
                 "has_fault": gold.has_fault, "top_pred": None,

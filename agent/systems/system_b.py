@@ -139,6 +139,8 @@ class SystemB:
 
     def __init__(self, model=None):
         self.settings = get_settings()
+        from ..telemetry import setup_telemetry
+        setup_telemetry(self.settings)  # no-op unless Langfuse keys are set
         # Resolve the model now: explicit arg > configured proxy model > None (stub set at run)
         self.model = model or build_model(self.settings)
         self.agent = build_agent(self.model)
@@ -179,6 +181,9 @@ class SystemB:
         usage = result.usage  # RunUsage (property in pydantic-ai 2.14)
         in_tok = getattr(usage, "input_tokens", 0) or 0
         out_tok = getattr(usage, "output_tokens", 0) or 0
+        from ..trace import extract_trace
+        trace = extract_trace(self.name, task["instance_id"], self.settings.model_name,
+                              result.all_messages())
         return RunResult(
             system=self.name,
             instance_id=task["instance_id"],
@@ -190,4 +195,5 @@ class SystemB:
             input_tokens=in_tok,
             output_tokens=out_tok,
             latency_s=round(time.monotonic() - t0, 1),
+            trace=trace,
         )

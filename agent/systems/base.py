@@ -28,6 +28,7 @@ class RunResult:
     input_tokens: int = 0
     output_tokens: int = 0
     latency_s: float = 0.0
+    trace: object = None                               # RunTrace — the ReAct loop record
     error: str | None = None                           # set if the run failed/aborted
 
 
