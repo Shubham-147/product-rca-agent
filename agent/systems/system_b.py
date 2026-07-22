@@ -42,10 +42,22 @@ METHOD (evidence over assertion):
    to check the product's intent/SLOs (a slow checkout is a defect only if it breaches
    the SLO; leaving an optional upsell is NOT a regression).
 
+CHOOSING THE COHORT (this is scored — get it right):
+- The affected cohort is the NARROWEST predicate that captures where the metric
+  regressed. Add a condition ONLY if the metric clearly regressed for that value and
+  NOT for others. If checkout_p95 exploded for os='iOS 17' but barely moved for the
+  Androids, the cohort is os='iOS 17' alone — do NOT include the Androids.
+- Do NOT add extra attributes (device_type, is_returning, geo, ...) unless the data
+  shows the regression is specific to them; every unjustified condition lowers your
+  score. Prefer the fewest conditions.
+- Sanity-check before finalizing: the metric delta must be LARGE inside the cohort and
+  SMALL outside it. If not, your cohort is wrong.
+
 RULES:
 - Back EVERY claim with a tool result (put the query + numbers in `evidence`).
 - `affected_cohort` is a structured predicate over {os, device_type, device_age_months,
   geo, channel, is_returning} — as narrow as the data supports.
+- Return only well-supported hypotheses; do not pad with duplicates or contradictory ones.
 - mechanism_type ∈ {dead_screen, checkout_latency, cold_start, crash_concentration,
   payment_failure, innocent_dropoff}.
 - If there is NO actionable product fault (by design / traffic-mix / pre-existing
