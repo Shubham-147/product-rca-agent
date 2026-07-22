@@ -54,8 +54,17 @@ def setup_telemetry(settings: Settings | None = None) -> bool:
     provider = TracerProvider(resource=Resource.create({"service.name": "product-rca-agent"}))
     provider.add_span_processor(BatchSpanProcessor(exporter))
     trace.set_tracer_provider(provider)
+    _STATE["provider"] = provider
 
     from pydantic_ai import Agent
     Agent.instrument_all()  # every agent emits LLM + tool spans from here on
     _STATE["enabled"] = True
     return True
+
+
+def flush_telemetry() -> None:
+    """Force-export any buffered spans (BatchSpanProcessor exports lazily otherwise).
+    Call before the process exits so the last runs actually reach Langfuse."""
+    provider = _STATE.get("provider")
+    if provider is not None:
+        provider.force_flush()

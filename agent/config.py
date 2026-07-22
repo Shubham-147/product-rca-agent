@@ -56,8 +56,18 @@ def build_model(settings: Settings | None = None):
     settings = settings or get_settings()
     if not settings.has_llm:
         return None
+    import httpx
     from pydantic_ai.models.openai import OpenAIChatModel
     from pydantic_ai.providers.openai import OpenAIProvider
 
-    provider = OpenAIProvider(base_url=settings.llm_base_url, api_key=settings.llm_api_key or "sk-noop")
+    # Hard network timeout at the client level (model_settings 'timeout' isn't always
+    # honored) so a stalled connection can never hang a run indefinitely.
+    http_client = httpx.AsyncClient(
+        timeout=httpx.Timeout(settings.request_timeout_s, connect=10.0)
+    )
+    provider = OpenAIProvider(
+        base_url=settings.llm_base_url,
+        api_key=settings.llm_api_key or "sk-noop",
+        http_client=http_client,
+    )
     return OpenAIChatModel(settings.model_name, provider=provider)

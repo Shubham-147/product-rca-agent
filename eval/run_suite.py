@@ -45,24 +45,41 @@ def _write_trace(res, iid: str) -> None:
 
 
 def _score_one(system, task_path: Path) -> dict:
+    """Run + score one instance into a NORMALIZED row (same keys for fault/no-fault/error
+    cases). Never raises — a failure becomes an error row so one bad case can't kill the
+    suite."""
     task = json.loads(task_path.read_text())
     iid = task["instance_id"]
     warehouse = str((DATA / task["warehouse"]).resolve())
-    res = system.run(task_path)
-    gold = load_gold(GROUND_TRUTH, iid)
-    _write_trace(res, iid)
-    if res.error:
-        return {"instance_id": iid, "error": res.error, "gold_fault": gold.fault_type,
-                "has_fault": gold.has_fault, "top_pred": None,
-                "top1_correct": False, "cohort_f1": 0.0, "false_positive": False,
-                "tokens": res.total_tokens, "latency_s": res.latency_s,
-                "input_tokens": res.input_tokens, "output_tokens": res.output_tokens}
-    s = score_case(res.hypotheses, gold, warehouse)
-    s.update(instance_id=iid, error=None, tokens=res.total_tokens,
-             input_tokens=res.input_tokens, output_tokens=res.output_tokens,
-             latency_s=res.latency_s, n_tool_calls=res.n_tool_calls,
-             top_cohort=res.hypotheses[0].affected_cohort if res.hypotheses else None)
-    return s
+    row = {"instance_id": iid, "gold_fault": "?", "has_fault": None, "top_pred": None,
+           "top1_correct": False, "cohort_f1": 0.0, "false_positive": False,
+           "recall_at_3": False, "error": None, "tokens": 0, "input_tokens": 0,
+           "output_tokens": 0, "latency_s": 0.0, "n_tool_calls": 0, "top_cohort": None}
+    try:
+        res = system.run(task_path)
+        gold = load_gold(GROUND_TRUTH, iid)
+        _write_trace(res, iid)
+        s = {} if res.error else score_case(res.hypotheses, gold, warehouse)
+        top_pred = s.get("top_pred") or (res.hypotheses[0].mechanism_type if res.hypotheses else None)
+        cf1 = s.get("cohort_f1")
+        row.update(
+            gold_fault=gold.fault_type, has_fault=gold.has_fault, top_pred=top_pred,
+            top1_correct=bool(s.get("top1_correct", False)),
+            cohort_f1=(0.0 if cf1 is None else cf1),
+            false_positive=bool(s.get("false_positive", False)),
+            recall_at_3=bool(s.get("recall_at_3", False)), error=res.error,
+            tokens=res.total_tokens, input_tokens=res.input_tokens,
+            output_tokens=res.output_tokens, latency_s=res.latency_s,
+            n_tool_calls=res.n_tool_calls,
+            top_cohort=res.hypotheses[0].affected_cohort if res.hypotheses else None,
+        )
+    except Exception as e:
+        row["error"] = f"suite:{type(e).__name__}: {e}"
+    flag = "ERR" if row["error"] else ("ok" if row["top1_correct"] else "")
+    print(f"  done {iid}: {row['gold_fault']:18s} -> {str(row['top_pred']):18s} "
+          f"top1={str(row['top1_correct']):5s} f1={row['cohort_f1']:.2f} {flag:3s} "
+          f"({row['tokens']}tok {row['latency_s']:.0f}s)", flush=True)
+    return row
 
 
 def aggregate(rows: list[dict], model: str) -> dict:
@@ -89,22 +106,45 @@ def aggregate(rows: list[dict], model: str) -> dict:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--limit", type=int, default=None)
-    ap.add_argument("--workers", type=int, default=3)
+    ap.add_argument("--workers", type=int, default=1)
+    ap.add_argument("--resume", action="store_true", help="skip instances already in the results file")
     args = ap.parse_args()
 
     from agent.systems.system_b import SystemB
     from agent.config import get_settings
     system = SystemB()
     model = get_settings().model_name
+    RESULTS_DIR.mkdir(exist_ok=True)
+    out = RESULTS_DIR / f"suite_system_{system.name}.json"
 
     tasks = sorted((DATA / "tasks").glob("task_inst_*.json"))
     if args.limit:
         tasks = tasks[: args.limit]
-    print(f"Running System {system.name} on {len(tasks)} instances "
-          f"(model={model}, workers={args.workers})...\n")
 
-    with ThreadPoolExecutor(max_workers=args.workers) as pool:
-        rows = list(pool.map(lambda t: _score_one(system, t), tasks))
+    # Resume: keep prior rows, skip their instances. Crash-safe: write after each case.
+    rows: list[dict] = []
+    done: set[str] = set()
+    if args.resume and out.exists():
+        rows = json.loads(out.read_text()).get("cases", [])
+        done = {r["instance_id"] for r in rows if not r.get("error")}
+    todo = [t for t in tasks if json.loads(t.read_text())["instance_id"] not in done]
+    print(f"Running System {system.name} on {len(todo)} instances "
+          f"(model={model}, workers={args.workers}, resume={args.resume}, skipped={len(done)})...\n")
+
+    def _flush():
+        rows.sort(key=lambda r: r["instance_id"])
+        out.write_text(json.dumps({"model": model, "aggregate": aggregate(rows, model),
+                                   "cases": rows}, indent=2, default=str))
+
+    if args.workers == 1:
+        for t in todo:
+            rows.append(_score_one(system, t))
+            _flush()  # incremental save — a crash loses nothing
+    else:
+        with ThreadPoolExecutor(max_workers=args.workers) as pool:
+            for r in pool.map(lambda t: _score_one(system, t), todo):
+                rows.append(r)
+                _flush()
     rows.sort(key=lambda r: r["instance_id"])
 
     print(f"  {'instance':11s} {'gold':18s} {'pred':18s} {'top1':5s} {'cohF1':6s} "
@@ -115,6 +155,9 @@ def main() -> None:
         print(f"  {r['instance_id']:11s} {r['gold_fault']:18s} {pred:18s} "
               f"{str(r['top1_correct']):5s} {r['cohort_f1']:<6.3f} "
               f"{str(r['false_positive'])[0]:3s} {r['tokens']:>7d} {r['latency_s']:>5.0f}")
+
+    from agent.telemetry import flush_telemetry
+    flush_telemetry()  # push buffered spans to Langfuse before exit
 
     agg = aggregate(rows, model)
     print("\nAGGREGATE:")
