@@ -29,29 +29,44 @@ funnel. A change may have been introduced at the changepoint; compare the BASELI
 (pre) vs RECENT (post) periods and explain any conversion regression.
 
 METHOD (evidence over assertion):
-1. Call `funnel` first to locate WHERE conversion drops (the symptom).
-2. Form a mechanism hypothesis for the worst step and CONFIRM it with `metric_by_segment`
-   (e.g. checkout_p95 / cold_start_p95 / crash_rate / payment_error_rate, sliced by a
-   user attribute). Name the MECHANISM, not the symptom.
-3. Identify WHO is affected: segment the metric to find the cohort, then size it with
-   `cohort_resolve`.
+1. Call `funnel` first to locate WHICH step's conversion drops post vs pre (the symptom).
+   The step that drops points to the mechanism — do NOT assume; let the funnel tell you.
+2. Match the worst step to its mechanism and CONFIRM with the corresponding metric:
+     app_open -> home_view drop .......... cold_start        (confirm: cold_start_p95)
+     a browse/detail step drop ........... dead_screen       (confirm: that step's
+                                           conversion collapses for a cohort, no latency)
+     checkout_start -> payment_submit .... checkout_latency  (confirm: checkout_p95)
+     payment_submit -> order_confirmed ... payment_failure   (confirm: payment_error_rate)
+     crashes elevated in a cohort ........ crash_concentration(confirm: crash_rate)
+   A metric only confirms a defect if it breaches the PRD SLO (check with `retrieve_spec`).
+3. Identify WHO is affected: segment the confirming metric by user attributes to find the
+   cohort where it regressed, then size it with `cohort_resolve`.
 4. RULE OUT confounders before committing: is it just old devices? a traffic-mix shift?
-   a pre-existing correlation? Check with another `metric_by_segment` call (e.g. hold os
-   fixed and slice by device_type). State what you ruled out.
+   a pre-existing correlation? Check with another `metric_by_segment` call (e.g. hold the
+   suspect attribute fixed and slice by another). State what you ruled out.
 5. Use `resolve_events` when unsure what a messy event name means, and `retrieve_spec`
-   to check the product's intent/SLOs (a slow checkout is a defect only if it breaches
-   the SLO; leaving an optional upsell is NOT a regression).
+   to check the product's intent/SLOs. If the drop is at an OPTIONAL step (upsell) or has
+   no metric breach and is explained by traffic-mix/design, it is `innocent_dropoff`.
 
 CHOOSING THE COHORT (this is scored — get it right):
 - The affected cohort is the NARROWEST predicate that captures where the metric
-  regressed. Add a condition ONLY if the metric clearly regressed for that value and
-  NOT for others. If checkout_p95 exploded for os='iOS 17' but barely moved for the
-  Androids, the cohort is os='iOS 17' alone — do NOT include the Androids.
+  regressed. Add a condition ONLY if the metric clearly regressed for that attribute
+  value and NOT for the others. Example shape (NOT the answer for any case): if a metric
+  regressed sharply for one os value but barely moved for the rest, the cohort is that
+  one os value alone — do not include the others.
 - Do NOT add extra attributes (device_type, is_returning, geo, ...) unless the data
   shows the regression is specific to them; every unjustified condition lowers your
   score. Prefer the fewest conditions.
 - Sanity-check before finalizing: the metric delta must be LARGE inside the cohort and
   SMALL outside it. If not, your cohort is wrong.
+
+EFFICIENCY (you have a limited tool budget — converge, don't wander):
+- Investigate deliberately with a few TARGETED queries, not dozens. A normal case needs
+  ~4-8 tool calls total: funnel, one or two confirming metrics, a cohort segmentation, a
+  confounder check, cohort_resolve.
+- As soon as you have (a) where the funnel drops, (b) a confirming metric breach, (c) the
+  cohort, and (d) one confounder ruled out — STOP and emit your hypothesis. Do not keep
+  exploring once you can support an answer.
 
 RULES:
 - Back EVERY claim with a tool result (put the query + numbers in `evidence`).
@@ -129,6 +144,8 @@ class SystemB:
         self.agent = build_agent(self.model)
 
     def run(self, task_path: str | Path, model=None) -> RunResult:
+        import time
+
         task = load_task(task_path)
         deps = Deps.for_task(str(task_path))
         limits = UsageLimits(
@@ -142,16 +159,25 @@ class SystemB:
                 "No LLM model available. Set RCA_LLM_BASE_URL for real runs, or pass a "
                 "stub model (TestModel/FunctionModel) to run()."
             )
+        model_settings = {
+            "temperature": self.settings.temperature,   # determinism (tenet #3)
+            "timeout": self.settings.request_timeout_s,  # no infinite network hang
+        }
+        t0 = time.monotonic()
         try:
             result = self.agent.run_sync(
                 task["question"], deps=deps, model=run_model, usage_limits=limits,
+                model_settings=model_settings,
             )
         except Exception as e:  # budget exhaustion / model error -> typed, non-fatal
             return RunResult(system=self.name, instance_id=task["instance_id"],
-                             hypotheses=[], error=f"{type(e).__name__}: {e}")
+                             hypotheses=[], error=f"{type(e).__name__}: {e}",
+                             latency_s=round(time.monotonic() - t0, 1))
 
         agent_out = list(result.output)
         usage = result.usage  # RunUsage (property in pydantic-ai 2.14)
+        in_tok = getattr(usage, "input_tokens", 0) or 0
+        out_tok = getattr(usage, "output_tokens", 0) or 0
         return RunResult(
             system=self.name,
             instance_id=task["instance_id"],
@@ -159,6 +185,8 @@ class SystemB:
             agent_output=agent_out,
             n_requests=getattr(usage, "requests", 0) or 0,
             n_tool_calls=getattr(usage, "tool_calls", 0) or 0,
-            total_tokens=(getattr(usage, "input_tokens", 0) or 0)
-                         + (getattr(usage, "output_tokens", 0) or 0),
+            total_tokens=in_tok + out_tok,
+            input_tokens=in_tok,
+            output_tokens=out_tok,
+            latency_s=round(time.monotonic() - t0, 1),
         )

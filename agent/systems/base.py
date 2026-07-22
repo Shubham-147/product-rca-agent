@@ -25,6 +25,9 @@ class RunResult:
     n_requests: int = 0
     n_tool_calls: int = 0
     total_tokens: int = 0
+    input_tokens: int = 0
+    output_tokens: int = 0
+    latency_s: float = 0.0
     error: str | None = None                           # set if the run failed/aborted
 
 
