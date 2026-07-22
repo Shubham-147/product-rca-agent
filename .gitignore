@@ -231,3 +231,6 @@ scratchpad/
 
 # Generated eval artifacts (reproducible)
 eval/retrieval_resolutions.csv
+
+# Generated per-run ReAct traces (regenerable)
+eval/traces/
