@@ -1,0 +1,180 @@
+"""Run a system across the whole benchmark and aggregate the scored metrics.
+
+This is the fitness function (design tenet #5): every change is judged here, on the
+full set, not on a single hand-picked instance. Reports the metrics from the brief —
+attribution top-1, cohort-F1, decoy false-positive rate, fault detection — plus
+cost/latency per case (tenet #6). Writes a JSON run manifest for diffing across runs.
+
+Usage:
+  ../.venv/bin/python -m eval.run_suite --system B                 # System B
+  ../.venv/bin/python -m eval.run_suite --system A --limit 5       # System A, first 5
+  ../.venv/bin/python -m eval.run_suite --system A --workers 4     # parallel cases
+  ../.venv/bin/python -m eval.run_suite --system C --limit 5       # LangGraph + falsifier
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+
+from eval.scorer import load_gold, score_case
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+DATA = REPO_ROOT / "data"
+GROUND_TRUTH = DATA / "ground_truth"
+RESULTS_DIR = REPO_ROOT / "eval" / "results"
+
+# Approx OpenRouter/OpenAI prices (USD per 1M tokens) for cost reporting. Update per model.
+PRICES = {
+    "openai/gpt-4o-mini": (0.15, 0.60), "gpt-4o-mini": (0.15, 0.60),
+    "openai/gpt-4o": (2.50, 10.0), "gpt-4o": (2.50, 10.0),
+    "gpt-5.4-mini": (0.75, 4.50),
+}
+
+
+TRACES_DIR = REPO_ROOT / "eval" / "traces"
+
+
+def _write_trace(res, iid: str) -> None:
+    """Persist the ReAct loop for this run (keyless observability)."""
+    if res.trace is None:
+        return
+    from agent.trace import write_trace
+    score = None
+    write_trace(res.trace, TRACES_DIR, hypotheses=res.hypotheses)
+
+
+def _score_one(system, task_path: Path) -> dict:
+    """Run + score one instance into a NORMALIZED row (same keys for fault/no-fault/error
+    cases). Never raises — a failure becomes an error row so one bad case can't kill the
+    suite."""
+    task = json.loads(task_path.read_text())
+    iid = task["instance_id"]
+    warehouse = str((DATA / task["warehouse"]).resolve())
+    row = {"instance_id": iid, "gold_fault": "?", "has_fault": None, "top_pred": None,
+           "top1_correct": False, "cohort_f1": 0.0, "false_positive": False,
+           "recall_at_3": False, "error": None, "tokens": 0, "input_tokens": 0,
+           "output_tokens": 0, "latency_s": 0.0, "n_tool_calls": 0, "top_cohort": None}
+    try:
+        res = system.run(task_path)
+        gold = load_gold(GROUND_TRUTH, iid)
+        _write_trace(res, iid)
+        s = {} if res.error else score_case(res.hypotheses, gold, warehouse)
+        top_pred = s.get("top_pred") or (res.hypotheses[0].mechanism_type if res.hypotheses else None)
+        cf1 = s.get("cohort_f1")
+        row.update(
+            gold_fault=gold.fault_type, has_fault=gold.has_fault, top_pred=top_pred,
+            top1_correct=bool(s.get("top1_correct", False)),
+            cohort_f1=(0.0 if cf1 is None else cf1),
+            false_positive=bool(s.get("false_positive", False)),
+            recall_at_3=bool(s.get("recall_at_3", False)), error=res.error,
+            tokens=res.total_tokens, input_tokens=res.input_tokens,
+            output_tokens=res.output_tokens, latency_s=res.latency_s,
+            n_tool_calls=res.n_tool_calls,
+            top_cohort=res.hypotheses[0].affected_cohort if res.hypotheses else None,
+        )
+    except Exception as e:
+        row["error"] = f"suite:{type(e).__name__}: {e}"
+    flag = "ERR" if row["error"] else ("ok" if row["top1_correct"] else "")
+    print(f"  done {iid}: {row['gold_fault']:18s} -> {str(row['top_pred']):18s} "
+          f"top1={str(row['top1_correct']):5s} f1={row['cohort_f1']:.2f} {flag:3s} "
+          f"({row['tokens']}tok {row['latency_s']:.0f}s)", flush=True)
+    return row
+
+
+def aggregate(rows: list[dict], model: str) -> dict:
+    fault = [r for r in rows if r.get("has_fault")]
+    nofault = [r for r in rows if not r.get("has_fault")]
+    n = len(rows)
+    pin, pout = PRICES.get(model, (0.0, 0.0))
+    cost = sum(r["input_tokens"] * pin + r["output_tokens"] * pout for r in rows) / 1e6
+    def mean(xs): return round(sum(xs) / len(xs), 3) if xs else 0.0
+    return {
+        "n": n,
+        "errors": sum(bool(r["error"]) for r in rows),
+        "top1_accuracy": mean([r["top1_correct"] for r in rows]),
+        "top1_accuracy_faultcases": mean([r["top1_correct"] for r in fault]),
+        "cohort_f1_mean_faultcases": mean([r["cohort_f1"] for r in fault]),
+        "decoy_fp_rate_nofault": mean([r["false_positive"] for r in nofault]),
+        "n_fault": len(fault), "n_nofault": len(nofault),
+        "total_tokens": sum(r["tokens"] for r in rows),
+        "est_cost_usd": round(cost, 4),
+        "mean_latency_s": mean([r["latency_s"] for r in rows]),
+    }
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--system", choices=("A", "B", "C"), default="B")
+    ap.add_argument("--limit", type=int, default=None)
+    ap.add_argument("--workers", type=int, default=1)
+    ap.add_argument("--resume", action="store_true", help="skip instances already in the results file")
+    args = ap.parse_args()
+
+    from agent.systems.system_a import SystemA
+    from agent.systems.system_b import SystemB
+    from agent.systems.system_c import SystemC
+    from agent.config import get_settings
+    systems = {"A": SystemA, "B": SystemB, "C": SystemC}
+    system = systems[args.system]()
+    model = get_settings().model_name
+    RESULTS_DIR.mkdir(exist_ok=True)
+    out = RESULTS_DIR / f"suite_system_{system.name}.json"
+
+    tasks = sorted((DATA / "tasks").glob("task_inst_*.json"))
+    if args.limit:
+        tasks = tasks[: args.limit]
+
+    # Resume: keep prior rows, skip their instances. Crash-safe: write after each case.
+    rows: list[dict] = []
+    done: set[str] = set()
+    if args.resume and out.exists():
+        rows = json.loads(out.read_text()).get("cases", [])
+        done = {r["instance_id"] for r in rows if not r.get("error")}
+    todo = [t for t in tasks if json.loads(t.read_text())["instance_id"] not in done]
+    print(f"Running System {system.name} on {len(todo)} instances "
+          f"(model={model}, workers={args.workers}, resume={args.resume}, skipped={len(done)})...\n")
+
+    def _flush():
+        rows.sort(key=lambda r: r["instance_id"])
+        out.write_text(json.dumps({"model": model, "aggregate": aggregate(rows, model),
+                                   "cases": rows}, indent=2, default=str))
+
+    if args.workers == 1:
+        for t in todo:
+            rows.append(_score_one(system, t))
+            _flush()  # incremental save — a crash loses nothing
+    else:
+        with ThreadPoolExecutor(max_workers=args.workers) as pool:
+            for r in pool.map(lambda t: _score_one(system, t), todo):
+                rows.append(r)
+                _flush()
+    rows.sort(key=lambda r: r["instance_id"])
+
+    print(f"  {'instance':11s} {'gold':18s} {'pred':18s} {'top1':5s} {'cohF1':6s} "
+          f"{'fp':3s} {'tok':>7s} {'s':>5s}")
+    for r in rows:
+        pred = (r.get("top_pred") or "-")[:18]
+        flag = "ERR" if r["error"] else ("ok" if r["top1_correct"] else "")
+        print(f"  {r['instance_id']:11s} {r['gold_fault']:18s} {pred:18s} "
+              f"{str(r['top1_correct']):5s} {r['cohort_f1']:<6.3f} "
+              f"{str(r['false_positive'])[0]:3s} {r['tokens']:>7d} {r['latency_s']:>5.0f}")
+
+    from agent.telemetry import flush_telemetry
+    flush_telemetry()  # push buffered spans to Langfuse before exit
+
+    agg = aggregate(rows, model)
+    print("\nAGGREGATE:")
+    for k, v in agg.items():
+        print(f"  {k:28s} {v}")
+
+    RESULTS_DIR.mkdir(exist_ok=True)
+    out = RESULTS_DIR / f"suite_system_{system.name}.json"
+    out.write_text(json.dumps({"model": model, "aggregate": agg, "cases": rows}, indent=2, default=str))
+    print(f"\nwritten -> {out}")
+
+
+if __name__ == "__main__":
+    main()
