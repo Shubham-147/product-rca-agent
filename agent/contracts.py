@@ -24,7 +24,15 @@ from pydantic import BaseModel, Field, field_validator
 
 from simulator.schemas import Evidence, Gold, Hypothesis  # shared definitions
 
-__all__ = ["Evidence", "Gold", "Hypothesis", "Cohort", "Condition", "Period", "ToolError"]
+__all__ = ["Evidence", "Gold", "Hypothesis", "AgentHypothesis", "Cohort", "Condition",
+           "Period", "ToolError", "MECHANISM_TYPES"]
+
+# The mechanism vocabulary the agent must choose from (matches simulator FaultType).
+MechanismType = Literal[
+    "dead_screen", "checkout_latency", "cold_start", "crash_concentration",
+    "payment_failure", "innocent_dropoff",
+]
+MECHANISM_TYPES = list(MechanismType.__args__)
 
 # The only columns a cohort predicate may reference — matches the task whitelist and
 # the warehouse `users` schema. Anything else is a validation error.
@@ -98,6 +106,30 @@ class Cohort(BaseModel):
 
     def __str__(self) -> str:
         return self.to_sql()
+
+
+class AgentHypothesis(BaseModel):
+    """What the agent emits: like `Hypothesis`, but `affected_cohort` is the typed
+    Cohort DSL, not a SQL string. Validated at the model boundary (a malformed cohort
+    is a caught error the agent repairs), then bridged to the simulator `Hypothesis`
+    (which the scorer consumes) via `.to_hypothesis()`."""
+
+    mechanism_type: MechanismType
+    mechanism: str
+    affected_cohort: Cohort
+    evidence: list[Evidence] = Field(default_factory=list)
+    confidence: float = 0.5
+    confounders_considered: list[str] = Field(default_factory=list)
+
+    def to_hypothesis(self) -> Hypothesis:
+        return Hypothesis(
+            mechanism_type=self.mechanism_type,
+            mechanism=self.mechanism,
+            affected_cohort=self.affected_cohort.to_sql(),  # DSL -> SQL bridge
+            evidence=self.evidence,
+            confidence=self.confidence,
+            confounders_considered=self.confounders_considered,
+        )
 
 
 class ToolError(BaseModel):

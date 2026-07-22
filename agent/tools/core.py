@@ -54,7 +54,7 @@ def funnel(deps: Deps, segment_by: list[str] | None = None) -> FunnelResult | To
     """Session-level step conversion pre vs post, optionally sliced by user attributes."""
     try:
         rows = deps.analytics.funnel(segment_by or [])
-    except ValueError as e:
+    except Exception as e:  # fail typed (tenet #7): never crash the run
         return ToolError(error=str(e), hint=f"segment_by must be a subset of {list(COHORT_COLS)}")
     return FunnelResult(
         segmented_by=segment_by or [],
@@ -71,10 +71,10 @@ def metric_by_segment(
     """A named metric sliced by segment(s), pre vs post, with deltas.
 
     `where` is a Cohort DSL (compiled to SQL here) — the tool never takes raw SQL."""
-    where_sql = where.to_sql() if where else None
     try:
+        where_sql = where.to_sql() if where else None
         rows = deps.analytics.metric_by_segment(metric, segment_by or [], where=where_sql)
-    except ValueError as e:
+    except Exception as e:  # fail typed (tenet #7)
         hint = f"valid metrics: {', '.join(VALID_METRICS)}"
         if "segment" in str(e):
             hint = f"segment_by must be a subset of {list(COHORT_COLS)}"
@@ -89,24 +89,30 @@ def cohort_resolve(deps: Deps, cohort: Cohort) -> CohortResult | ToolError:
     """Compile a Cohort predicate to its user-id set size (the affected-population count)."""
     try:
         res = deps.analytics.cohort_resolve(cohort)
-    except ValueError as e:
+    except Exception as e:  # fail typed (tenet #7)
         return ToolError(error=str(e),
                          hint="check op/value coherence (op 'in' needs a list; others a scalar)")
     return CohortResult(predicate=res.predicate, n_users=res.n_users)
 
 
-def resolve_events(query: str, k: int = 8) -> EventResolution:
+def resolve_events(query: str, k: int = 8) -> EventResolution | ToolError:
     """Resolve a cursed / free-text event term to ranked canonical event concepts."""
-    r = _resolve_events(query, k=k)
+    try:
+        r = _resolve_events(query, k=k)
+    except Exception as e:  # fail typed (tenet #7)
+        return ToolError(error=str(e), hint="pass a short event term, e.g. 'checkout'")
     return EventResolution(
         query=r.query, resolved=r.resolved, confidence=r.confidence,
         candidates=[EventCandidate(name=c.name, score=c.score) for c in r.candidates],
     )
 
 
-def retrieve_spec(deps: Deps, query: str, k: int = 4) -> SpecResult:
+def retrieve_spec(deps: Deps, query: str, k: int = 4) -> SpecResult | ToolError:
     """Dense RAG over the PRD (+ tickets) — the product's intent / SLOs / design choices."""
-    hits = deps.spec.query(query, k=k)
+    try:
+        hits = deps.spec.query(query, k=k)
+    except Exception as e:  # fail typed (tenet #7)
+        return ToolError(error=str(e), hint="pass a natural-language question about the product")
     return SpecResult(query=query, hits=[SpecHit(**vars(h)) for h in hits])
 
 
