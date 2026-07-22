@@ -20,10 +20,9 @@ from __future__ import annotations
 import numpy as np
 
 from .concepts import Concept
+from .embedder import MODEL_NAME, get_embedder
 from .lexical import AnchorIndex, Signal
 from .normalize import normalize
-
-MODEL_NAME = "BAAI/bge-small-en-v1.5"
 
 
 def _l2(m: np.ndarray) -> np.ndarray:
@@ -35,9 +34,7 @@ class DenseSignal(Signal):
 
     def __init__(self, index: AnchorIndex, model_name: str = MODEL_NAME):
         super().__init__(index)
-        from fastembed import TextEmbedding
-
-        self.model = TextEmbedding(model_name)
+        self.model = get_embedder(model_name)
         self.concept_ids = [c.concept_id for c in index.concepts]
         profiles = [self._profile(c) for c in index.concepts]
         self.matrix = _l2(np.array(list(self.model.embed(profiles))))  # (n_concepts, d)
