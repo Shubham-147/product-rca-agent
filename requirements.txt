@@ -3,3 +3,12 @@ duckdb>=1.0
 pydantic>=2.0
 numpy>=1.26
 pandas>=2.0
+
+# Retrieval pipeline (Phase 1a) — offline event resolution, no LLM
+scikit-learn>=1.4   # char-ngram TF-IDF
+rapidfuzz>=3.0      # fuzzy token/edit similarity
+fastembed>=0.3      # local bge-small ONNX embeddings (no torch)
+
+# Agent (System B) — ReAct over the tool layer
+pydantic-ai-slim[openai]>=2.14   # typed tool-calling agent + OpenAI/LiteLLM client
+pydantic-settings>=2.0           # env-driven config
